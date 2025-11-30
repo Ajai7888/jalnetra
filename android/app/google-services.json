@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "143910909092",
+    "project_id": "jalnetra-44a79",
+    "storage_bucket": "jalnetra-44a79.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:143910909092:android:44172b7c5e318b5be5e231",
+        "android_client_info": {
+          "package_name": "com.example.jalnetra01"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyApsaCKxPw-_iIdJ-eTE30eu84GyCcnlQ4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
