@@ -29,7 +29,25 @@ class SupervisorDashboardScreen extends StatefulWidget {
 }
 
 class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
+  // State to manage date filtering (used within the stream builders)
   DateFilter _currentFilter = DateFilter.all;
+
+  // New state to manage the currently displayed section (Drawer navigation)
+  int _selectedIndex = 0; // 0=PENDING, 1=HISTORY, 2=MAP, 3=ALERTS
+
+  final List<String> _pageTitles = [
+    'Verification Queue',
+    'Verification History',
+    'Map View',
+    'Alerts & Incidents',
+  ];
+
+  final List<IconData> _pageIcons = [
+    Icons.pending_actions,
+    Icons.history,
+    Icons.map,
+    Icons.warning_amber,
+  ];
 
   // Function to apply filtering based on the selected criteria
   List<WaterReading> _applyFilter(List<WaterReading> readings) {
@@ -48,69 +66,141 @@ class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
     }).toList();
   }
 
+  // --- Widget for the current body content ---
+  Widget _getBodyWidget() {
+    switch (_selectedIndex) {
+      case 0:
+        return _buildVerificationQueue();
+      case 1:
+        return _buildHistoryView();
+      case 2:
+        return const SupervisorMapView();
+      case 3:
+        return const SupervisorAlertsView();
+      default:
+        return _buildVerificationQueue();
+    }
+  }
+
   // ----------------------------------------------------------------------
-  // BUILD METHOD
+  // BUILD METHOD (REFRACTORED TO USE DRAWER)
   // ----------------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 4, // PENDING, HISTORY, MAP VIEW, ALERTS
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('JALNETRA - Supervisor'),
-          actions: [
-            // Profile Button
-            IconButton(
-              icon: const Icon(Icons.person),
-              tooltip: 'Profile',
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const ProfileScreen()),
-                );
-              },
-            ),
-            // Logout Button
-            IconButton(
-              icon: const Icon(Icons.logout),
-              tooltip: 'Logout',
-              onPressed: () async {
-                await FirebaseService().signOut();
-                if (context.mounted) {
-                  Navigator.pushAndRemoveUntil(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const RoleSelectionScreen(),
-                    ),
-                    (route) => false,
-                  );
-                }
-              },
-            ),
-          ],
-          bottom: const TabBar(
-            tabs: [
-              Tab(text: 'PENDING'),
-              Tab(text: 'HISTORY'),
-              Tab(text: 'MAP VIEW'),
-              Tab(text: 'ALERTS'),
-            ],
+    return Scaffold(
+      // 1. Remove DefaultTabController, use standard Scaffold
+      appBar: AppBar(
+        title: Text('JALNETRA - Supervisor (${_pageTitles[_selectedIndex]})'),
+        // No 'bottom' property here
+        actions: [
+          // Profile Button
+          IconButton(
+            icon: const Icon(Icons.person),
+            tooltip: 'Profile',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ProfileScreen()),
+              );
+            },
           ),
-        ),
-        body: TabBarView(
-          children: [
-            _buildVerificationQueue(),
-            _buildHistoryView(),
-            const SupervisorMapView(),
-            const SupervisorAlertsView(),
+          // Logout Button
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: 'Logout',
+            onPressed: () async {
+              await FirebaseService().signOut();
+              if (context.mounted) {
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const RoleSelectionScreen(),
+                  ),
+                  (route) => false,
+                );
+              }
+            },
+          ),
+        ],
+      ),
+
+      // 2. Add Drawer (The new menu bar)
+      drawer: _buildDrawer(context),
+
+      // 3. Body shows the selected widget
+      body: _getBodyWidget(),
+    );
+  }
+
+  // ───────────────── DRAWER IMPLEMENTATION ─────────────────
+
+  Widget _buildDrawer(BuildContext context) {
+    return Drawer(
+      child: Container(
+        color: Theme.of(context).scaffoldBackgroundColor, // Dark background
+        child: Column(
+          children: <Widget>[
+            // Drawer Header
+            DrawerHeader(
+              decoration: BoxDecoration(
+                color: Theme.of(context).primaryColor.withOpacity(0.1),
+              ),
+              child: const SizedBox(
+                width: double.infinity,
+                child: Text(
+                  'Supervisor Menu',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+
+            // Navigation List Items
+            for (int i = 0; i < _pageTitles.length; i++)
+              ListTile(
+                leading: Icon(
+                  _pageIcons[i],
+                  color: _selectedIndex == i
+                      ? Theme.of(context).primaryColor
+                      : Colors.white70,
+                ),
+                title: Text(
+                  _pageTitles[i],
+                  style: TextStyle(
+                    color: _selectedIndex == i
+                        ? Theme.of(context).primaryColor
+                        : Colors.white,
+                  ),
+                ),
+                selected: _selectedIndex == i,
+                onTap: () {
+                  setState(() {
+                    _selectedIndex = i;
+                  });
+                  Navigator.pop(context); // Close the drawer
+                },
+              ),
+
+            const Spacer(),
+            // Separator/Footer
+            const Padding(
+              padding: EdgeInsets.all(16.0),
+              child: Text(
+                "JALNETRA v1.0",
+                style: TextStyle(color: Colors.white54, fontSize: 12),
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  // ───────────────── STREAM BUILDERS ─────────────────
+  // ───────────────── STREAM BUILDERS (USED IN BODY) ─────────────────
 
   Widget _buildVerificationQueue() {
     return StreamBuilder<List<WaterReading>>(
@@ -192,7 +282,8 @@ class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (isPendingQueue)
+          // System Overview is only displayed in the PENDING tab (index 0)
+          if (_selectedIndex == 0)
             _buildSystemOverview(
               pendingTotal,
               filteredReadings.length,
@@ -200,7 +291,8 @@ class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
             ),
 
           const SizedBox(height: 20),
-          _buildFilterDropdown(),
+          // Only show filter for the PENDING and HISTORY tabs
+          if (_selectedIndex <= 1) _buildFilterDropdown(),
           const SizedBox(height: 10),
 
           // Verification List
@@ -289,14 +381,12 @@ class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
     );
   }
 
-  // ───────────────── FORENSIC HELPER FUNCTIONS (RESTORED) ─────────────────
+  // ───────────────── FORENSIC HELPER FUNCTIONS ─────────────────
 
-  /// Finds the previous reading for the same site ID that occurred *before* the current reading.
   WaterReading? _getPreviousReading(
     WaterReading current,
     List<WaterReading> allReadings,
   ) {
-    // 1. Filter readings for the same site ID that occurred BEFORE the current one.
     final previousReadings = allReadings
         .where(
           (r) =>
@@ -305,12 +395,10 @@ class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
         )
         .toList();
 
-    // FIX: Safely return null if no previous reading exists.
     if (previousReadings.isEmpty) {
       return null;
     }
 
-    // 2. Find the most recent one among the filtered list
     return previousReadings.reduce(
       (a, b) => a.timestamp.isAfter(b.timestamp) ? a : b,
     );
@@ -358,7 +446,6 @@ class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
           appBar: AppBar(title: const Text("Gauge Image Forensics")),
           body: PhotoView(
             imageProvider: NetworkImage(imageUrl),
-            // Ensure Hero is only used on the image, not the whole card
             heroAttributes: PhotoViewHeroAttributes(tag: imageUrl),
           ),
         ),
@@ -504,8 +591,7 @@ class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
                 child: Image.network(
                   reading.imageUrl,
                   fit: BoxFit.cover,
-                  // You should add loadingBuilder and errorBuilder here
-                  // to match the original implementation if they were removed.
+                  // NOTE: Original image builders are omitted here, but should be added for robustness
                 ),
               ),
             ),
