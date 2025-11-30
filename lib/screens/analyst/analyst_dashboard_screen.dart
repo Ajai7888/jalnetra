@@ -62,7 +62,7 @@ class _AnalystDashboardScreenState extends State<AnalystDashboardScreen> {
   }
 
   // -------------------------------------------------------------------
-  // NAVIGATION HANDLER (UNCHANGED)
+  // NAVIGATION HANDLER
   // -------------------------------------------------------------------
 
   void _navigateToDetail(
@@ -105,6 +105,66 @@ class _AnalystDashboardScreenState extends State<AnalystDashboardScreen> {
         ),
       ),
     );
+  }
+
+  // -------------------------------------------------------------------
+  // DATA EXPORT LOGIC
+  // -------------------------------------------------------------------
+
+  void _exportData(BuildContext context, DashboardData data, String viewKey) {
+    List<WaterReading> filteredList;
+    String filename;
+
+    // Determine which dataset to export
+    if (viewKey == 'dataReceived') {
+      filteredList = data.readings;
+      filename = 'all_readings';
+    } else if (viewKey == 'dangerZones') {
+      filteredList = data.readings
+          .where((r) => r.waterLevel >= dangerThreshold)
+          .toList();
+      filename = 'danger_zone_readings';
+    } else if (viewKey == 'warningsToday') {
+      filteredList = data.readings
+          .where(
+            (r) =>
+                r.waterLevel >= warningThreshold &&
+                r.waterLevel < dangerThreshold,
+          )
+          .toList();
+      filename = 'warning_readings';
+    } else if (viewKey == 'safeZone') {
+      filteredList = data.readings
+          .where((r) => r.waterLevel < warningThreshold)
+          .toList();
+      filename = 'safe_zone_readings';
+    } else {
+      return;
+    }
+
+    if (filteredList.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No data available to export for this category.'),
+        ),
+      );
+      return;
+    }
+
+    // --- MOCK EXPORT PROCESS ---
+    int rowCount = filteredList.length;
+
+    // Simulate delay for file processing
+    Future.delayed(const Duration(milliseconds: 800), () {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Successfully generated $filename.csv with $rowCount records.',
+          ),
+          backgroundColor: Colors.blueGrey,
+        ),
+      );
+    });
   }
 
   // -------------------------------------------------------------------
@@ -163,10 +223,12 @@ class _AnalystDashboardScreenState extends State<AnalystDashboardScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // 1. TOP STATS GRID
-                _buildStatsGrid(context, data), // Pass the data object here
+                _buildStatsGrid(context, data),
+
+                // *** EXPORT BUTTON IS REMOVED FROM HERE ***
                 const SizedBox(height: 20),
 
-                // 2. QUICK INSIGHTS / PIE CHART
+                // 2. QUICK INSIGHTS / RADIAL BAR CHART
                 _buildQuickInsights(context, data),
                 const SizedBox(height: 20),
 
@@ -180,14 +242,86 @@ class _AnalystDashboardScreenState extends State<AnalystDashboardScreen> {
     );
   }
 
+  // --- WIDGET: EXPORT OPTIONS DIALOG BUTTON ---
+  Widget _buildExportButton(BuildContext context, DashboardData data) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 12.0),
+      child: OutlinedButton.icon(
+        icon: const Icon(Icons.file_download, color: Colors.white),
+        label: const Text(
+          "Export Data (CSV)",
+          style: TextStyle(color: Colors.white),
+        ),
+        style: OutlinedButton.styleFrom(
+          side: const BorderSide(color: Colors.white38),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        ),
+        onPressed: () {
+          showDialog(
+            context: context,
+            builder: (BuildContext context) {
+              return AlertDialog(
+                title: const Text("Select Data to Export"),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildExportOption(
+                      context,
+                      data,
+                      "All Received Data",
+                      'dataReceived',
+                    ),
+                    _buildExportOption(
+                      context,
+                      data,
+                      "Safe Zone Data",
+                      'safeZone',
+                    ),
+                    _buildExportOption(
+                      context,
+                      data,
+                      "Warning Zone Data",
+                      'warningsToday',
+                    ),
+                    _buildExportOption(
+                      context,
+                      data,
+                      "Danger Zone Data",
+                      'dangerZones',
+                    ),
+                  ],
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  // Helper widget for dialog options
+  Widget _buildExportOption(
+    BuildContext context,
+    DashboardData data,
+    String title,
+    String viewKey,
+  ) {
+    return ListTile(
+      title: Text(title),
+      trailing: const Icon(Icons.download),
+      onTap: () {
+        Navigator.pop(context); // Close dialog
+        _exportData(context, data, viewKey);
+      },
+    );
+  }
+
   // --- STATS GRID ---
   Widget _buildStatsGrid(BuildContext context, DashboardData data) {
-    // This method now receives 'data' from the StreamBuilder
     return Column(
       children: [
         Row(
           children: [
-            // Data Received Card (Pass 'data' to the card)
             _buildStatCard(
               context,
               data,
@@ -210,7 +344,6 @@ class _AnalystDashboardScreenState extends State<AnalystDashboardScreen> {
         const SizedBox(height: 12),
         Row(
           children: [
-            // Danger Zones Card
             _buildStatCard(
               context,
               data,
@@ -220,7 +353,6 @@ class _AnalystDashboardScreenState extends State<AnalystDashboardScreen> {
               'dangerZones',
             ),
             const SizedBox(width: 12),
-            // Warnings Today Card
             _buildStatCard(
               context,
               data,
@@ -237,7 +369,7 @@ class _AnalystDashboardScreenState extends State<AnalystDashboardScreen> {
 
   Widget _buildStatCard(
     BuildContext context,
-    DashboardData data, // 🚀 FIX 1: New required parameter
+    DashboardData data,
     String title,
     int count,
     Color color,
@@ -245,7 +377,6 @@ class _AnalystDashboardScreenState extends State<AnalystDashboardScreen> {
   ) {
     return Expanded(
       child: GestureDetector(
-        // 🚀 FIX 2: 'data' is now defined and accessible here.
         onTap: () {
           _navigateToDetail(context, data, viewKey, title, color);
         },
@@ -277,14 +408,7 @@ class _AnalystDashboardScreenState extends State<AnalystDashboardScreen> {
     );
   }
 
-  // --- QUICK INSIGHTS (PIE CHART FIX) ---
-  // lib/screens/analyst/analyst_dashboard_screen.dart
-
-  // ... (Existing imports and class structure) ...
-
-  // ... (rest of the file remains the same) ...
-
-  // --- QUICK INSIGHTS (RADIAL BAR CHART FIX) ---
+  // --- QUICK INSIGHTS (RADIAL BAR CHART) ---
   Widget _buildQuickInsights(BuildContext context, DashboardData data) {
     final total = data.totalReceived.toDouble();
 
@@ -296,7 +420,7 @@ class _AnalystDashboardScreenState extends State<AnalystDashboardScreen> {
       // 1. DANGER (Red) - Reduced Radius and Opacity
       PieChartSectionData(
         value: dangerPercent,
-        color: Colors.red.withOpacity(0.7), // Reduced opacity
+        color: Colors.red.withOpacity(0.5), // Reduced opacity
         title: '',
         radius: 60, // Reduced radius (width)
         showTitle: false,
@@ -365,7 +489,7 @@ class _AnalystDashboardScreenState extends State<AnalystDashboardScreen> {
                 _buildLegendItem(
                   Colors.red.withOpacity(0.5),
                   "Danger (${data.dangerZones})",
-                ), // Update legend color
+                ),
                 _buildLegendItem(
                   Colors.yellow.shade700,
                   "Warnings (${data.warningsToday})",

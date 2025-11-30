@@ -5,7 +5,9 @@ import 'package:jalnetra01/common/firebase_service.dart';
 import 'package:jalnetra01/models/user_models.dart';
 import 'package:jalnetra01/common/loading_screen.dart';
 
-import '../../common/profile_screen.dart';
+// Import the missing RoleSelectionScreen from the correct path
+import '../../auth/role_selection_screen.dart';
+import '../../common/profile_screen.dart'; // Ensure correct path for ProfileScreen
 
 // ------------------------------------------------------
 // THEME COLORS (for consistency with the Admin UI design)
@@ -29,7 +31,7 @@ class AdminHomePage extends StatelessWidget {
         backgroundColor: const Color.fromARGB(255, 0, 13, 6),
         title: const Text("Admin Dashboard"),
         actions: [
-          // 1. Profile Icon (Navigate to ProfileScreen)
+          // 1. Profile Icon
           IconButton(
             icon: const Icon(Icons.person),
             tooltip: 'View Profile',
@@ -40,20 +42,18 @@ class AdminHomePage extends StatelessWidget {
               );
             },
           ),
-          // 2. Logout Button
+          // 2. Logout Button (FIXED)
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Logout',
             onPressed: () async {
               await FirebaseService().signOut();
-              // Navigate back to role selection screen after logout
+              // FIX: Replaced Placeholder with actual RoleSelectionScreen
               if (context.mounted) {
                 Navigator.pushAndRemoveUntil(
                   context,
                   MaterialPageRoute(
-                    // NOTE: Assuming RoleSelectionScreen is available in the main app structure
-                    builder: (_) =>
-                        const Text('Placeholder for RoleSelectionScreen'),
+                    builder: (_) => const RoleSelectionScreen(),
                   ),
                   (route) => false,
                 );
@@ -149,13 +149,12 @@ class AdminHomePage extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // FIX: Wrap the icon and text in Expanded to push the button correctly
+          // FIX: Apply Overflow fix
           Expanded(
             child: Row(
               children: [
                 Icon(icon, color: color, size: 28),
                 const SizedBox(width: 15),
-                // Wrap title text in Expanded to ensure it shrinks
                 Expanded(
                   child: Text(
                     title,
@@ -210,8 +209,6 @@ class SupervisorPage extends StatelessWidget {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const LoadingScreen();
           }
-          // The error "cloud_firestore/permission-denied" must be fixed
-          // by updating Firestore Rules to allow 'list' access for admins.
           if (snapshot.hasError) {
             return Center(
               child: Text(
@@ -243,7 +240,6 @@ class SupervisorPage extends StatelessWidget {
                         'N/A', // Use Designation for siteId placeholder
                     officerId: user.employeeId ?? 'N/A',
                     showRemoveButton: true,
-                    // FIX: Pass the Firestore UID for removal
                     userId: user.id,
                   ),
                 )
@@ -306,7 +302,6 @@ class FieldOfficerPage extends StatelessWidget {
                         'N/A', // Use Department for siteId placeholder
                     officerId: user.employeeId ?? 'N/A',
                     showRemoveButton: true,
-                    // FIX: Pass the Firestore UID for removal
                     userId: user.id,
                   ),
                 )
@@ -366,7 +361,6 @@ class AnalystPage extends StatelessWidget {
                         user.designation ??
                         'N/A', // Using Designation as region placeholder
                     showRemoveButton: true,
-                    // FIX: Pass the Firestore UID for removal
                     userId: user.id,
                   ),
                 )
@@ -481,7 +475,7 @@ class OfficerTile extends StatelessWidget {
   final String siteId; // Used for Department/Designation display
   final String officerId; // Used for Employee ID display
   final bool showRemoveButton;
-  final String userId; // Added required parameter
+  final String userId; // Firestore UID
 
   const OfficerTile({
     super.key,
@@ -489,7 +483,7 @@ class OfficerTile extends StatelessWidget {
     required this.siteId,
     required this.officerId,
     this.showRemoveButton = false,
-    required this.userId, // Added required parameter
+    required this.userId,
   });
 
   @override

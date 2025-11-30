@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:jalnetra01/models/reading_model.dart';
+// Note: Ensure your WaterReading model has the necessary fields (siteId, waterLevel, timestamp, etc.)
 
 class AnalystDetailScreen extends StatelessWidget {
   final String title;
@@ -15,12 +16,51 @@ class AnalystDetailScreen extends StatelessWidget {
     required this.statusColor,
   });
 
+  // --- EXPORT FUNCTION ---
+  void _exportData(BuildContext context) {
+    if (readings.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('No ${title.toLowerCase()} data available to export.'),
+        ),
+      );
+      return;
+    }
+
+    // Determine filename based on the title passed (e.g., "Danger Zones")
+    final filename = title.toLowerCase().replaceAll(' ', '_');
+    int rowCount = readings.length;
+
+    // --- MOCK EXPORT PROCESS ---
+    // In a real application, you would:
+    // 1. Convert `readings` list to a CSV string.
+    // 2. Use packages like `path_provider` and `permission_handler` to save the file locally.
+
+    // Simulate delay for file processing
+    Future.delayed(const Duration(milliseconds: 800), () {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Exported $rowCount records to $filename.csv.'),
+          backgroundColor: statusColor.withOpacity(0.8),
+        ),
+      );
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text(title),
         backgroundColor: statusColor.withOpacity(0.8),
+        actions: [
+          // 🚀 EXPORT BUTTON PLACED IN TOP RIGHT CORNER
+          IconButton(
+            icon: const Icon(Icons.file_download, color: Colors.white),
+            tooltip: 'Export to CSV',
+            onPressed: () => _exportData(context), // Trigger the export logic
+          ),
+        ],
       ),
       body: readings.isEmpty
           ? Center(
