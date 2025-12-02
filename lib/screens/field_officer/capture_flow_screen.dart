@@ -2,14 +2,14 @@
 
 import 'dart:io';
 import 'dart:typed_data';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:steganograph/steganograph.dart';
-
+import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:jalnetra01/common/custom_button.dart';
 import 'package:jalnetra01/common/firebase_service.dart';
 import 'package:jalnetra01/models/reading_model.dart';
@@ -52,7 +52,7 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
   QRSiteData? _scannedQRData;
   bool _isWithinGeofence = false;
   bool _isCheckingStatus = true;
-  bool _hasValidatedGeofence = false; // <--- NEW FLAG
+  bool _hasValidatedGeofence = false;
   double _distanceFromSite = 0.0;
   Position? _currentPosition;
 
@@ -60,13 +60,111 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
 
   static const double geofenceLimitMeters = 25.0; // 25 meters maximum
 
+  // --- Speech-to-Text State ---
+  final stt.SpeechToText _speechToText = stt.SpeechToText();
+  bool _speechEnabled = false;
+  bool _isListening = false;
+  String _recognizedText = '';
+  // ----------------------------
+
   @override
   void initState() {
     super.initState();
+    _initSpeech(); // Initialize Speech on load
     _checkLiveLocation(); // Start the flow automatically
   }
 
-  // --- STEP 1: LIVE LOCATION CHECK ---
+  // --- SPEECH INITIALIZATION ---
+  void _initSpeech() async {
+    _speechEnabled = await _speechToText.initialize(
+      onError: (e) => debugPrint('STT Error: ${e.errorMsg}'),
+    );
+    if (mounted) setState(() {});
+  }
+  // lib/screens/field_officer/capture_flow_screen.dart (inside _CaptureFlowScreenState)
+
+  // ... (Other speech methods) ...
+
+  // --- START/STOP LISTENING TOGGLE (FIXED LOGIC) ---
+  void _toggleListening() async {
+    if (!_speechEnabled) {
+      _showSnackBar(
+        "Speech recognition not available. Check permissions.",
+        Colors.red,
+      );
+      return;
+    }
+
+    if (_isListening) {
+      // STOP LISTENING (User tap or immediate stop needed)
+      await _speechToText.stop();
+      // Set state to false immediately after calling stop.
+      if (mounted) setState(() => _isListening = false);
+      // NOTE: We rely on the final result from onResult OR the next check
+      // to trigger processing. However, if the user stops it mid-sentence,
+      // we must process the recognized buffer.
+      _processSpeechResult();
+    } else {
+      // START LISTENING
+      _recognizedText = '';
+
+      // Ensure the keyboard is closed before starting mic input
+      FocusScope.of(context).unfocus();
+
+      // Start the listen session. The 'onStatus' parameter is removed.
+      await _speechToText.listen(
+        onResult: _onSpeechResult,
+        localeId: 'en_US',
+        listenFor: const Duration(seconds: 10), // Max time limit
+      );
+
+      // Update the listening state based on the package's getter after starting
+      if (mounted) setState(() => _isListening = _speechToText.isListening);
+    }
+  }
+
+  // --- RESULT HANDLER (Minor Adjustment) ---
+  void _onSpeechResult(SpeechRecognitionResult result) {
+    if (mounted) {
+      setState(() {
+        _recognizedText = result.recognizedWords;
+
+        if (result.finalResult) {
+          // Final result, set listening state to false and process
+          _isListening = false;
+          _processSpeechResult();
+        }
+      });
+    }
+  }
+
+  // --- PROCESS RESULT (Extracts numbers) ---
+  void _processSpeechResult() {
+    if (_recognizedText.isEmpty) return;
+
+    // Simple filter: only keep digits and the decimal point
+    String cleanText = _recognizedText.replaceAll(RegExp(r'[^\d\.]'), '');
+
+    // Attempt to parse the cleaned numeric string
+    final double? parsedLevel = double.tryParse(cleanText);
+
+    if (parsedLevel != null && parsedLevel >= 0 && parsedLevel < 100) {
+      _levelController.text = parsedLevel.toStringAsFixed(2);
+      _showSnackBar(
+        "Level set via voice: ${parsedLevel.toStringAsFixed(2)}m",
+        Colors.green,
+      );
+    } else {
+      _showSnackBar(
+        "Voice input not recognized as a valid water level.",
+        Colors.orange,
+      );
+      _levelController.clear();
+    }
+    _recognizedText = ''; // Clear recognized text after processing
+  }
+
+  // --- STEP 1: LIVE LOCATION CHECK (Remains the same) ---
   Future<void> _checkLiveLocation() async {
     setState(() {
       _isCheckingStatus = true;
@@ -88,7 +186,6 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
         desiredAccuracy: LocationAccuracy.high,
       );
 
-      // Success -> Move to QR Scan (Step 2)
       if (mounted) setState(() => _currentStep = 2);
     } catch (e) {
       debugPrint('Location Check Error: $e');
@@ -99,14 +196,13 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
     }
   }
 
-  // --- STEP 2: QR SCAN EXECUTION & DATA PARSING ---
+  // --- STEP 2: QR SCAN EXECUTION & DATA PARSING (Remains the same) ---
   Future<void> _scanAndParseQR() async {
     setState(() {
       _isCheckingStatus = true;
-      _hasValidatedGeofence = false; // reset for fresh validation
+      _hasValidatedGeofence = false;
     });
 
-    // Launch QR Scanner Page
     final String? result = await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const QRScannerScreen()),
@@ -126,8 +222,6 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
         throw Exception("Live GPS missing for QR processing.");
       }
 
-      // NOTE: For demo we use live GPS as QR geo-ref.
-      // In production, these should come from QR/site master data.
       final qrData = QRSiteData(
         siteId: result,
         latitude: _currentPosition!.latitude,
@@ -138,7 +232,7 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
       if (mounted) {
         setState(() {
           _scannedQRData = qrData;
-          _currentStep = 3; // Move to Geofencing Validation
+          _currentStep = 3;
         });
       }
     } catch (e) {
@@ -149,7 +243,7 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
     }
   }
 
-  // --- STEP 3: GEOFENCING VALIDATION ---
+  // --- STEP 3: GEOFENCING VALIDATION (Remains the same) ---
   Future<void> _validateGeofence() async {
     if (_currentPosition == null || _scannedQRData == null) {
       if (mounted) setState(() => _currentStep = 1);
@@ -161,7 +255,6 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
       _isWithinGeofence = false;
     });
 
-    // Calculate distance between LIVE GPS and QR's site location
     final distanceInMeters = Geolocator.distanceBetween(
       _currentPosition!.latitude,
       _currentPosition!.longitude,
@@ -178,7 +271,7 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
     }
   }
 
-  // --- STEP 4: IMAGE CAPTURE (Execution) ---
+  // --- STEP 4: IMAGE CAPTURE (Execution) (Remains the same) ---
   Future<void> _capturePhoto() async {
     final picker = ImagePicker();
     final XFile? pickedFile = await picker.pickImage(
@@ -189,32 +282,25 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
     if (pickedFile != null) {
       setState(() {
         _capturedImage = File(pickedFile.path);
-        _currentStep = 5; // Move to Log Reading step
+        _currentStep = 5;
       });
     } else {
       _showSnackBar("Photo capture cancelled. Please retry.", Colors.orange);
       if (mounted) {
-        setState(() => _currentStep = 3); // Go back to geofencing step
+        setState(() => _currentStep = 3);
       }
     }
   }
 
-  // lib/screens/field_officer/capture_flow_screen.dart
-
-  // ... (existing code and imports) ...
-
-  // --- STEP 5: LOG READING & SUBMISSION (Steganography) ---
+  // --- STEP 5: LOG READING & SUBMISSION (Steganography) (Remains the same) ---
   Future<File> _encodeReadingData(File originalImage, double waterLevel) async {
     final user = FirebaseAuth.instance.currentUser;
-    final officerEmail = user!.email ?? 'N/A'; // Get email for audit trail
+    final officerEmail = user!.email ?? 'N/A';
 
     String metadata =
-        // ----------------------------------------------------------------------------------
-        // FINAL AUDIT METADATA STRUCTURE
-        // ----------------------------------------------------------------------------------
         "SiteID:${_scannedQRData!.siteId}|"
         "OfficerID:${user.uid}|"
-        "OfficerEmail:$officerEmail|" // INCLUDE OFFICER EMAIL
+        "OfficerEmail:$officerEmail|"
         "Level:${waterLevel.toStringAsFixed(2)}m|"
         "GeoLiveLat:${_currentPosition!.latitude.toStringAsFixed(5)}|"
         "GeoLiveLon:${_currentPosition!.longitude.toStringAsFixed(5)}|"
@@ -286,7 +372,7 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
     }
   }
 
-  // --- UTILITY METHODS ---
+  // --- UTILITY METHODS (Remains the same) ---
   void _showSnackBar(String message, Color color) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -306,7 +392,6 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
       case 3:
         return _buildStep3GeofenceValidation();
       case 4:
-        // Automatically move to capture camera when in step 4
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _capturePhoto();
         });
@@ -359,7 +444,7 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
     );
   }
 
-  // --- STEP 1 UI ---
+  // --- STEP 1 UI (Remains the same) ---
   Widget _buildStep1LiveLocation() {
     return Column(
       children: [
@@ -416,7 +501,7 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
     );
   }
 
-  // --- STEP 2 UI ---
+  // --- STEP 2 UI (Remains the same) ---
   Widget _buildStep2QRScan() {
     return Column(
       children: [
@@ -451,9 +536,8 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
     );
   }
 
-  // --- STEP 3 UI ---
+  // --- STEP 3 UI (Remains the same) ---
   Widget _buildStep3GeofenceValidation() {
-    // trigger validation once when we enter this step
     if (!_hasValidatedGeofence) {
       _hasValidatedGeofence = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -564,8 +648,9 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
     );
   }
 
-  // --- STEP 5 UI ---
+  // --- STEP 5 UI (MODIFIED) ---
   Widget _buildStep5LogReading() {
+    // ... (The rest of the UI build remains the same, focusing on the TextFormField section) ...
     return SingleChildScrollView(
       child: Form(
         key: _formKey,
@@ -622,12 +707,26 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
               ],
             ),
             const SizedBox(height: 20),
+
+            // --- TEXT FIELD WITH MIC ICON ---
             TextFormField(
               controller: _levelController,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: "Water Level (meters)",
-                hintText: "Enter reading manually...",
+                // Hint text reflects the mic state
+                hintText: _isListening
+                    ? "Listening... Say the water level (e.g., 4.25)"
+                    : "Enter reading manually...",
                 suffixText: "m",
+                // MIC ICON BUTTON
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _isListening ? Icons.mic : Icons.mic_none,
+                    color: _isListening ? Colors.redAccent : Colors.white70,
+                  ),
+                  onPressed: _speechEnabled ? _toggleListening : null,
+                  tooltip: _isListening ? 'Tap to Stop' : 'Tap for Voice Input',
+                ),
               ),
               keyboardType: const TextInputType.numberWithOptions(
                 decimal: true,
@@ -636,6 +735,20 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
                   ? 'Water level is required'
                   : null,
             ),
+            // --- SHOW RECOGNIZED TEXT WHILE LISTENING ---
+            if (_isListening)
+              Padding(
+                padding: const EdgeInsets.only(top: 8.0),
+                child: Text(
+                  'Recognizing: $_recognizedText',
+                  style: const TextStyle(
+                    fontStyle: FontStyle.italic,
+                    color: Colors.blueAccent,
+                  ),
+                ),
+              ),
+
+            // --- END TEXT FIELD ---
             const SizedBox(height: 30),
             _isSubmitting
                 ? const Center(child: CircularProgressIndicator())
@@ -655,6 +768,7 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
   @override
   void dispose() {
     _levelController.dispose();
+    _speechToText.cancel(); // Cancel any ongoing listening session
     super.dispose();
   }
 }

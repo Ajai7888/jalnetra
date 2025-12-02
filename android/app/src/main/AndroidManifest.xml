@@ -8,12 +8,15 @@
     <uses-feature android:name="android.hardware.camera" />
 
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <uses-permission android:name="android.permission.INTERNET"/>
 
     <application
         android:label="jalnetra01"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
-
         android:enableOnBackInvokedCallback="true">
 
         <activity
@@ -38,10 +41,15 @@
             android:name="flutterEmbedding"
             android:value="2" />
     </application>
+
     <queries>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
     </queries>
+
 </manifest>

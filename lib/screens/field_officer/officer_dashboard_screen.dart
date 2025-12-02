@@ -6,8 +6,12 @@ import 'package:geolocator/geolocator.dart';
 import 'package:jalnetra01/common/firebase_service.dart';
 import 'package:jalnetra01/screens/auth/role_selection_screen.dart';
 import 'package:jalnetra01/screens/field_officer/capture_flow_screen.dart';
-import 'package:jalnetra01/screens/common/profile_screen.dart'; // Import for Profile Access
+import 'package:jalnetra01/screens/common/profile_screen.dart';
 import 'package:jalnetra01/utils/constants.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+
+import '../common/WeatherScreen.dart'; // Make sure WeatherScreen exists
 
 class OfficerDashboardScreen extends StatefulWidget {
   const OfficerDashboardScreen({super.key});
@@ -17,10 +21,12 @@ class OfficerDashboardScreen extends StatefulWidget {
 }
 
 class _OfficerDashboardScreenState extends State<OfficerDashboardScreen> {
+  // ✔ Weather API Key
+  final String _apiKey = '567ccd2e4f1ca68963303481ce41996b';
+
   String _currentLocationName = "Fetching Current Site...";
   bool _isLocationAvailable = false;
-  Position?
-  _currentPosition; // Stores current GPS position for Reverse Geocoding
+  Position? _currentPosition;
 
   @override
   void initState() {
@@ -28,16 +34,14 @@ class _OfficerDashboardScreenState extends State<OfficerDashboardScreen> {
     _fetchCurrentLocationName();
   }
 
-  /// Fetches the user's current GPS position and translates it into a readable address.
+  // -------- LOCATION FETCH ----------
   Future<void> _fetchCurrentLocationName() async {
     try {
-      // 1. Get current position
       Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.low,
       );
-      _currentPosition = position; // Store position for use in the Capture Flow
+      _currentPosition = position;
 
-      // 2. Reverse Geocoding to get address
       List<Placemark> placemarks = await placemarkFromCoordinates(
         position.latitude,
         position.longitude,
@@ -45,7 +49,6 @@ class _OfficerDashboardScreenState extends State<OfficerDashboardScreen> {
 
       if (placemarks.isNotEmpty) {
         final p = placemarks.first;
-        // Use a combination of name/street/sublocality for a readable address
         String address = "${p.name}, ${p.subLocality ?? p.locality}";
 
         if (mounted) {
@@ -67,13 +70,109 @@ class _OfficerDashboardScreenState extends State<OfficerDashboardScreen> {
     }
   }
 
+  // -------- WEATHER FETCH BY GPS ----------
+  Future<WeatherData?> _fetchWeatherDataByCoordinates(
+    double lat,
+    double lon,
+  ) async {
+    final currentUrl = Uri.parse(
+      'https://api.openweathermap.org/data/2.5/weather?lat=$lat&lon=$lon&units=metric&appid=$_apiKey',
+    );
+
+    try {
+      final response = await http.get(currentUrl);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        // Weather icon logic
+        String getWeatherIcon(int code) {
+          if (code < 300) return '⛈️';
+          if (code < 600) return '🌧️';
+          if (code < 700) return '❄️';
+          if (code < 800) return '🌫️';
+          if (code == 800) return '☀️';
+          if (code > 800) return '☁️';
+          return '❓';
+        }
+
+        final apiCityName = data['name'] ?? 'Current Location';
+
+        int rainChanceMock =
+            (data['weather'][0]['main'] == 'Rain' ||
+                data['weather'][0]['main'] == 'Drizzle')
+            ? 70
+            : 0;
+
+        return WeatherData(
+          weatherIcon: getWeatherIcon(data['weather'][0]['id']),
+          temperature: data['main']['temp'],
+          humidity: data['main']['humidity'],
+          windSpeed: data['wind']['speed'] * 3.6, // m/s → km/h
+          rainChance: rainChanceMock,
+          description: data['weather'][0]['description'],
+          location: apiCityName,
+        );
+      } else {
+        debugPrint("Weather API Error: ${response.statusCode}");
+        _showSnackBar("Weather API Error", Colors.red);
+        return null;
+      }
+    } catch (e) {
+      debugPrint("Weather Exception: $e");
+      return null;
+    }
+  }
+
+  // -------- WEATHER BUTTON HANDLER ----------
+  void _handleWeatherCheck() async {
+    if (_currentPosition == null) {
+      _showSnackBar("GPS unavailable. Enable location services.", Colors.red);
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Fetching live weather data...')),
+    );
+
+    final weather = await _fetchWeatherDataByCoordinates(
+      _currentPosition!.latitude,
+      _currentPosition!.longitude,
+    );
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+      if (weather != null) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) =>
+                WeatherScreen(weather: weather, location: weather.location),
+          ),
+        );
+      }
+    }
+  }
+
+  void _showSnackBar(String message, Color color) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message), backgroundColor: color));
+  }
+
+  // ============ UI =============
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Field Personnel Dashboard'),
         actions: [
-          // 1. Profile Button
+          IconButton(
+            icon: const Icon(Icons.cloud_queue),
+            onPressed: _currentPosition != null ? _handleWeatherCheck : null,
+            tooltip: 'Check Weather',
+          ),
           IconButton(
             icon: const Icon(Icons.person_outline),
             onPressed: () {
@@ -84,7 +183,6 @@ class _OfficerDashboardScreenState extends State<OfficerDashboardScreen> {
             },
             tooltip: 'View Profile',
           ),
-          // 2. Logout Button
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {
@@ -105,7 +203,6 @@ class _OfficerDashboardScreenState extends State<OfficerDashboardScreen> {
       ),
       body: Stack(
         children: [
-          // Clear map-like container replacing the asset
           Center(
             child: Container(
               color: Colors.blueGrey.shade900,
@@ -131,19 +228,16 @@ class _OfficerDashboardScreenState extends State<OfficerDashboardScreen> {
             ),
           ),
 
-          // Current Site Card (Displays Live Location Name)
           Positioned(
             top: 20,
             left: 20,
             right: 20,
             child: Card(
-              color: Theme.of(context).cardColor,
               elevation: 4,
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Row(
                   children: [
-                    // Show a spinning icon while fetching location name
                     _isLocationAvailable
                         ? const Icon(
                             Icons.my_location,
@@ -167,7 +261,7 @@ class _OfficerDashboardScreenState extends State<OfficerDashboardScreen> {
             ),
           ),
 
-          // Floating Action Button (Triggers Capture Flow)
+          // Floating Action Button
           Positioned(
             bottom: 30,
             left: MediaQuery.of(context).size.width / 2 - 35,
@@ -175,18 +269,16 @@ class _OfficerDashboardScreenState extends State<OfficerDashboardScreen> {
               height: 70,
               width: 70,
               child: FloatingActionButton(
-                onPressed:
-                    _isLocationAvailable // Only allow capture if location is available
+                onPressed: _isLocationAvailable
                     ? () {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            // Launch CaptureFlowScreen, which handles its own location check on step 1
                             builder: (_) => const CaptureFlowScreen(),
                           ),
                         );
                       }
-                    : null, // Disable button if location is unavailable
+                    : null,
                 backgroundColor: _isLocationAvailable
                     ? Theme.of(context).primaryColor
                     : Colors.grey,

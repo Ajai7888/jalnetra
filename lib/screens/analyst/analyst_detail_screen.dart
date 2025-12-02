@@ -2,7 +2,10 @@
 
 import 'package:flutter/material.dart';
 import 'package:jalnetra01/models/reading_model.dart';
-// Note: Ensure your WaterReading model has the necessary fields (siteId, waterLevel, timestamp, etc.)
+import 'package:path_provider/path_provider.dart'; // Import for file paths
+import 'dart:io'; // Import for File operations
+import 'package:csv/csv.dart'; // Import for CSV conversion
+import 'package:share_plus/share_plus.dart'; // Import for sharing files
 
 class AnalystDetailScreen extends StatelessWidget {
   final String title;
@@ -16,35 +19,84 @@ class AnalystDetailScreen extends StatelessWidget {
     required this.statusColor,
   });
 
-  // --- EXPORT FUNCTION ---
-  void _exportData(BuildContext context) {
+  // --- ACTUAL EXPORT AND SHARE FUNCTION ---
+  Future<void> _exportAndShareData(BuildContext context) async {
     if (readings.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('No ${title.toLowerCase()} data available to export.'),
+          backgroundColor: Colors.redAccent,
         ),
       );
       return;
     }
 
-    // Determine filename based on the title passed (e.g., "Danger Zones")
-    final filename = title.toLowerCase().replaceAll(' ', '_');
-    int rowCount = readings.length;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Preparing ${title.toLowerCase()} data for export...'),
+        backgroundColor: Colors.blueGrey,
+      ),
+    );
 
-    // --- MOCK EXPORT PROCESS ---
-    // In a real application, you would:
-    // 1. Convert `readings` list to a CSV string.
-    // 2. Use packages like `path_provider` and `permission_handler` to save the file locally.
+    try {
+      // 1. Prepare CSV data
+      List<List<dynamic>> csvData = [];
+      // Add header row
+      csvData.add(['Site ID', 'Water Level (m)', 'Timestamp', 'Is Verified']);
+      // Add reading data
+      for (var reading in readings) {
+        csvData.add([
+          reading.siteId,
+          reading.waterLevel.toStringAsFixed(2),
+          reading.timestamp.toLocal().toIso8601String().substring(
+            0,
+            16,
+          ), // Format timestamp
+          reading.isVerified ? 'Yes' : 'No', // Assuming isVerified is a field
+        ]);
+      }
 
-    // Simulate delay for file processing
-    Future.delayed(const Duration(milliseconds: 800), () {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Exported $rowCount records to $filename.csv.'),
-          backgroundColor: statusColor.withOpacity(0.8),
-        ),
-      );
-    });
+      String csvString = const ListToCsvConverter().convert(csvData);
+
+      // 2. Get a temporary directory to store the file
+      final directory = await getTemporaryDirectory();
+      final filename = '${title.toLowerCase().replaceAll(' ', '_')}_data.csv';
+      final filePath = '${directory.path}/$filename';
+      final file = File(filePath);
+
+      // 3. Write CSV string to the file
+      await file.writeAsString(csvString);
+
+      // 4. Show success bar AND trigger native share sheet
+      if (context.mounted) {
+        // Show success bar first
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Successfully exported ${readings.length} records. Sharing file...',
+            ),
+            backgroundColor: statusColor.withOpacity(0.8),
+          ),
+        );
+
+        // Then open the share sheet
+        await Share.shareXFiles(
+          [XFile(filePath)],
+          text: 'JALNETRA: ${title} data export.',
+          subject: 'Water Reading Data',
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to export data: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      print('Error exporting data: $e'); // Log the error for debugging
+    }
   }
 
   @override
@@ -54,11 +106,15 @@ class AnalystDetailScreen extends StatelessWidget {
         title: Text(title),
         backgroundColor: statusColor.withOpacity(0.8),
         actions: [
-          // 🚀 EXPORT BUTTON PLACED IN TOP RIGHT CORNER
+          // EXPORT BUTTON
           IconButton(
-            icon: const Icon(Icons.file_download, color: Colors.white),
-            tooltip: 'Export to CSV',
-            onPressed: () => _exportData(context), // Trigger the export logic
+            icon: const Icon(
+              Icons.file_download,
+              color: Colors.white,
+            ), // Changed icon to share
+            tooltip: 'Export & Share Data',
+            onPressed: () =>
+                _exportAndShareData(context), // Call the new function
           ),
         ],
       ),
