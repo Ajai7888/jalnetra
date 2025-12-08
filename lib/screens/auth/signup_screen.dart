@@ -6,6 +6,9 @@ import 'package:jalnetra01/common/custom_button.dart';
 import 'package:jalnetra01/common/firebase_service.dart';
 import 'package:jalnetra01/models/user_models.dart';
 import 'package:jalnetra01/screens/auth/login_screen.dart';
+import 'package:jalnetra01/main.dart';
+
+import '../../l10n/app_localizations.dart';
 
 class SignUpScreen extends StatefulWidget {
   final UserRole role;
@@ -18,6 +21,7 @@ class SignUpScreen extends StatefulWidget {
 
 class _SignUpScreenState extends State<SignUpScreen> {
   final _formKey = GlobalKey<FormState>();
+
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _nameController = TextEditingController();
@@ -29,10 +33,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   final FirebaseService _firebaseService = FirebaseService();
   bool _isLoading = false;
-
   late UserRole _selectedRole;
 
-  // ⚠️ FIX: Define the Admin Authorization Key here.
   static const String kAdminAuthCode = "JALNETRA@2025";
 
   @override
@@ -41,60 +43,73 @@ class _SignUpScreenState extends State<SignUpScreen> {
     _selectedRole = widget.role;
   }
 
-  // --- HELPER FUNCTION: GET TITLE BASED ON CURRENT STATE ---
-  String _getRoleTitle() {
+  // 1. UPDATED: Add Public User title
+  String _getRoleTitle(AppLocalizations t) {
     switch (_selectedRole) {
       case UserRole.fieldOfficer:
-        return 'Field Officer Registration';
+        return t.fieldOfficerRegistration;
       case UserRole.supervisor:
-        return 'Supervisor Registration';
+        return t.supervisorRegistration;
       case UserRole.analyst:
-        return 'Analyst Registration';
+        return t.analystRegistration;
       case UserRole.admin:
-        return 'Administrator Registration';
+        return t.adminRegistration;
+      case UserRole.publicUser: // 🆕 Handle Public User
+        // You must have 'publicUserRegistration' in your .arb files
+        return t.publicUserRegistration;
       default:
-        return 'User Registration';
+        return t.registrationSuccessful;
     }
   }
 
-  // --- HELPER FUNCTION: GET FIELD LIST BASED ON CURRENT STATE ---
-  List<Map<String, dynamic>> _getRequiredFields() {
-    List<Map<String, dynamic>> fields = [
+  // 2. UPDATED: Conditional fields for Public User
+  List<Map<String, dynamic>> _getRequiredFields(AppLocalizations t) {
+    final fields = <Map<String, dynamic>>[
       {
-        'label': 'Full Name',
+        'label': t.fullName,
         'controller': _nameController,
         'keyboard': TextInputType.name,
         'icon': Icons.person,
       },
       {
-        'label': 'Official Email',
+        'label': t.officialEmail, // Using officialEmail label for simplicity
         'controller': _emailController,
         'keyboard': TextInputType.emailAddress,
         'icon': Icons.email,
       },
       {
-        'label': 'Password (min 6 chars)',
+        'label': t.passwordMin,
         'controller': _passwordController,
+        'keyboard': TextInputType.text,
         'icon': Icons.lock,
         'obscure': true,
       },
-      {
-        'label': 'Employee ID',
-        'controller': _employeeIdController,
-        'keyboard': TextInputType.text,
-        'icon': Icons.badge,
-      },
     ];
 
-    if (_selectedRole == UserRole.fieldOfficer) {
+    // Fields for Field Officer AND Public User (People)
+    if (_selectedRole == UserRole.fieldOfficer ||
+        _selectedRole == UserRole.publicUser) {
       fields.add({
-        'label': 'Phone Number',
+        'label': t.phoneNumber,
         'controller': _phoneController,
         'keyboard': TextInputType.phone,
         'icon': Icons.phone,
       });
+    }
+
+    // Fields for all staff roles (non-public)
+    if (_selectedRole != UserRole.publicUser) {
       fields.add({
-        'label': 'Department',
+        'label': t.employeeId,
+        'controller': _employeeIdController,
+        'keyboard': TextInputType.text,
+        'icon': Icons.badge,
+      });
+    }
+
+    if (_selectedRole == UserRole.fieldOfficer) {
+      fields.add({
+        'label': t.department,
         'controller': _departmentController,
         'keyboard': TextInputType.text,
         'icon': Icons.apartment,
@@ -103,17 +118,16 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
     if (_selectedRole == UserRole.supervisor) {
       fields.add({
-        'label': 'Designation',
+        'label': t.designation,
         'controller': _designationController,
         'keyboard': TextInputType.text,
         'icon': Icons.military_tech,
       });
     }
 
-    // --- ADMIN FIELDS ---
     if (_selectedRole == UserRole.admin) {
       fields.add({
-        'label': 'Admin Authorization Code',
+        'label': t.adminCode,
         'controller': _adminCodeController,
         'keyboard': TextInputType.text,
         'icon': Icons.vpn_key,
@@ -121,12 +135,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
         'isSpecial': true,
       });
     }
-    // --- END ADMIN FIELDS ---
 
     return fields;
   }
 
   void _showResultDialog(String title, String message, bool success) {
+    final t = AppLocalizations.of(context)!;
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -137,131 +152,152 @@ class _SignUpScreenState extends State<SignUpScreen> {
           ),
         ),
         content: Text(message),
-        actions: <Widget>[
+        actions: [
           TextButton(
-            child: const Text('OK'),
             onPressed: () {
               Navigator.of(ctx).pop();
               if (success) {
-                // Navigate back to login screen using the ROLE THEY SIGNED UP FOR
                 Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => LoginScreen(role: _selectedRole),
+                    builder: (_) => LoginScreen(role: _selectedRole),
                   ),
                 );
               }
             },
+            child: Text(t.okay),
           ),
         ],
       ),
     );
   }
 
+  // 3. UPDATED: Conditional fields in _handleSignUp
   Future<void> _handleSignUp() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
+    final t = AppLocalizations.of(context)!;
 
-    // --- ADMIN CODE VALIDATION (FIXED LOGIC) ---
+    if (!_formKey.currentState!.validate()) return;
+
     if (_selectedRole == UserRole.admin) {
-      // ⚠️ FIX: Check against the correct constant
       if (_adminCodeController.text.trim() != kAdminAuthCode) {
-        _showResultDialog(
-          "Authorization Failed",
-          "Invalid Admin Code. Registration requires a valid authorization key.",
-          false,
-        );
-        return; // Stop execution if code is wrong
+        _showResultDialog(t.authorizationFailed, t.invalidAdminCode, false);
+        return;
       }
     }
-    // --- END ADMIN CODE VALIDATION ---
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     try {
       await _firebaseService.signUp(
         _emailController.text.trim(),
         _passwordController.text.trim(),
         _nameController.text.trim(),
-        _selectedRole, // Use the role selected in the dropdown
-        phone: _phoneController.text.trim().isNotEmpty
+        _selectedRole,
+        // Public User and Field Officer need phone
+        phone:
+            (_selectedRole == UserRole.publicUser ||
+                _selectedRole == UserRole.fieldOfficer)
             ? _phoneController.text.trim()
             : null,
-        employeeId: _employeeIdController.text.trim().isNotEmpty
+        // Staff roles need employeeId (Public User should pass null/empty)
+        employeeId: _selectedRole != UserRole.publicUser
             ? _employeeIdController.text.trim()
             : null,
-        department: _departmentController.text.trim().isNotEmpty
+        // Department only for Field Officer
+        department: _selectedRole == UserRole.fieldOfficer
             ? _departmentController.text.trim()
             : null,
-        designation: _designationController.text.trim().isNotEmpty
+        // Designation only for Supervisor
+        designation: _selectedRole == UserRole.supervisor
             ? _designationController.text.trim()
             : null,
       );
 
       _showResultDialog(
-        "Registration Successful",
-        "Your account for the ${_selectedRole.name} role has been created. Please log in.",
+        t.registrationSuccessful,
+        // Use 'People' for display when role is publicUser
+        t.accountCreatedMsg(
+          _selectedRole == UserRole.publicUser ? 'People' : _selectedRole.name,
+        ),
         true,
       );
     } on FirebaseAuthException catch (e) {
-      // ... (Error handling remains unchanged) ...
       String message;
       if (e.code == 'email-already-in-use') {
-        message =
-            'This email is already registered. Please use the Login screen.';
+        message = t.emailInUse;
       } else if (e.code == 'weak-password') {
-        message = 'The password is too weak. Choose a stronger one.';
+        message = t.weakPassword;
       } else {
-        message = 'Registration failed: ${e.message}';
+        message = '${t.registrationFailed}: ${e.message}';
       }
-      _showResultDialog("Registration Failed", message, false);
-    } catch (e) {
-      _showResultDialog(
-        "Registration Failed",
-        "An unexpected error occurred. Please try again.",
-        false,
-      );
+      _showResultDialog(t.registrationFailed, message, false);
+    } catch (_) {
+      _showResultDialog(t.registrationFailed, t.unexpectedError, false);
     } finally {
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+        setState(() => _isLoading = false);
       }
     }
   }
 
-  // --- UI BUILDER ---
   @override
   Widget build(BuildContext context) {
-    // The UI now changes based on the internal state variable _selectedRole
+    final t = AppLocalizations.of(context)!;
+    final locale = Localizations.localeOf(context);
+    final selectedLang = locale.languageCode;
+
+    final languageMap = <String, String>{
+      'en': 'English',
+      'hi': 'हिन्दी',
+      'ta': 'தமிழ்',
+    };
+
     return Scaffold(
-      appBar: AppBar(title: Text(_getRoleTitle())),
+      appBar: AppBar(
+        title: Text(_getRoleTitle(t)),
+        actions: [
+          DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: selectedLang,
+              dropdownColor: Colors.black87,
+              icon: const Icon(Icons.language, color: Colors.white),
+              style: const TextStyle(color: Colors.white),
+              items: languageMap.entries
+                  .map(
+                    (e) => DropdownMenuItem<String>(
+                      value: e.key,
+                      child: Text(e.value),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) {
+                if (value != null) {
+                  JalNetraApp.setLocale(context, Locale(value));
+                }
+              },
+            ),
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
           child: Form(
             key: _formKey,
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Center(
-                  child: Icon(
-                    Icons.person_add,
-                    size: 60,
-                    color: Colors.white70,
-                  ),
-                ),
+                const Icon(Icons.person_add, size: 60, color: Colors.white70),
                 const SizedBox(height: 20),
-                // --- ROLE SELECTION DROPDOWN ADDED HERE ---
-                _buildRoleDropdown(),
+                _buildRoleDropdown(t),
                 const SizedBox(height: 20),
-
                 Text(
-                  'Registration Details for ${_selectedRole.name} Role',
+                  // Use 'People' for display when role is publicUser
+                  t.registrationDetails(
+                    _selectedRole == UserRole.publicUser
+                        ? 'People'
+                        : _selectedRole.name,
+                  ),
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     fontSize: 20,
@@ -269,66 +305,61 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   ),
                 ),
                 const SizedBox(height: 30),
-
-                // Dynamically build form fields
-                ..._getRequiredFields().map((field) {
-                  // Determine if the field is required based on role
-                  bool isRequired =
-                      field['label'] != 'Phone Number' ||
-                      _selectedRole == UserRole.fieldOfficer ||
-                      field['isSpecial'] == true;
+                ..._getRequiredFields(t).map((field) {
+                  final label = field['label'] as String;
+                  final controller =
+                      field['controller'] as TextEditingController;
+                  final icon = field['icon'] as IconData;
+                  final keyboard = field['keyboard'] as TextInputType?;
+                  final obscure = field['obscure'] == true;
 
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 20.0),
                     child: TextFormField(
-                      controller: field['controller'],
+                      controller: controller,
                       decoration: InputDecoration(
-                        labelText: field['label'],
-                        prefixIcon: Icon(field['icon']),
+                        labelText: label,
+                        prefixIcon: Icon(icon),
                       ),
-                      keyboardType: field['keyboard'] ?? TextInputType.text,
-                      obscureText: field['obscure'] == true,
+                      keyboardType: keyboard ?? TextInputType.text,
+                      obscureText: obscure,
                       validator: (value) {
-                        if (isRequired && (value == null || value.isEmpty)) {
-                          return '${field['label']} is required';
+                        if (value == null || value.isEmpty) {
+                          return '$label is required';
                         }
-                        if (field['label'] == 'Official Email' &&
-                            !value!.contains('@')) {
+                        if (label == t.officialEmail && !value.contains('@')) {
                           return 'Enter a valid email address';
                         }
-                        if (field['label'] == 'Password (min 6 chars)' &&
-                            value!.length < 6) {
+                        if (label == t.passwordMin && value.length < 6) {
                           return 'Password must be at least 6 characters';
                         }
-                        // Validation specific to the Admin Code field
-                        if (field['isSpecial'] == true &&
-                            value!.trim() != kAdminAuthCode &&
-                            value.isNotEmpty) {
-                          // This specific validation is now handled in _handleSignUp to match the error dialog
+                        // Basic phone number validation for Field Officer and People
+                        if (label == t.phoneNumber &&
+                            (_selectedRole == UserRole.publicUser ||
+                                _selectedRole == UserRole.fieldOfficer)) {
+                          if (!RegExp(
+                            r'^\d{10}$',
+                          ).hasMatch(value.replaceAll(RegExp(r'[\s\-]'), ''))) {
+                            return 'Enter a valid 10-digit phone number';
+                          }
                         }
                         return null;
                       },
                     ),
                   );
                 }).toList(),
-
                 const SizedBox(height: 20),
-
                 _isLoading
-                    ? const Center(child: CircularProgressIndicator())
+                    ? const CircularProgressIndicator()
                     : CustomButton(
-                        text: 'Register Account',
-                        onPressed: _handleSignUp,
+                        text: t.registerAccount,
                         icon: Icons.app_registration,
+                        onPressed: _handleSignUp,
                       ),
                 const SizedBox(height: 20),
-
                 TextButton(
-                  onPressed: () {
-                    // Navigate back to login screen
-                    Navigator.pop(context);
-                  },
-                  child: const Text('Already have an account? Back to Login'),
+                  onPressed: () => Navigator.pop(context),
+                  child: Text(t.backToLogin),
                 ),
               ],
             ),
@@ -338,12 +369,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
     );
   }
 
-  // --- ROLE DROPDOWN WIDGET ---
-  Widget _buildRoleDropdown() {
-    // Filter out publicUser from the selection list
-    final roles = UserRole.values
-        .where((r) => r != UserRole.publicUser)
-        .toList();
+  // 4. UPDATED: Include Public User in the dropdown and rename it to 'PEOPLE'
+  Widget _buildRoleDropdown(AppLocalizations t) {
+    // Include all roles this time
+    final roles = UserRole.values.toList();
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12.0),
@@ -356,30 +385,33 @@ class _SignUpScreenState extends State<SignUpScreen> {
         child: DropdownButton<UserRole>(
           isExpanded: true,
           value: _selectedRole,
+          dropdownColor: Colors.grey.shade900,
           icon: const Icon(Icons.arrow_drop_down, color: Colors.white70),
           style: const TextStyle(fontSize: 16, color: Colors.white),
-          dropdownColor: Colors.grey.shade900,
-          onChanged: (UserRole? newValue) {
+          items: roles.map((role) {
+            return DropdownMenuItem<UserRole>(
+              value: role,
+              child: Text(
+                role == UserRole.publicUser
+                    ? 'PEOPLE' // 🆕 Display name for public user
+                    : role.name.toUpperCase().replaceAll('_', ' '),
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+            );
+          }).toList(),
+          onChanged: (newValue) {
             if (newValue != null) {
               setState(() {
                 _selectedRole = newValue;
-                // Clear dynamic controllers when role changes to avoid misvalidation
+                // Clear non-relevant fields when role changes
                 _phoneController.clear();
+                _employeeIdController.clear();
                 _departmentController.clear();
                 _designationController.clear();
                 _adminCodeController.clear();
               });
             }
           },
-          items: roles.map<DropdownMenuItem<UserRole>>((UserRole role) {
-            return DropdownMenuItem<UserRole>(
-              value: role,
-              child: Text(
-                role.name.toUpperCase().replaceAll('_', ' '),
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-            );
-          }).toList(),
         ),
       ),
     );
@@ -394,7 +426,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     _employeeIdController.dispose();
     _departmentController.dispose();
     _designationController.dispose();
-    _adminCodeController.dispose(); // <-- DISPOSE NEW CONTROLLER
+    _adminCodeController.dispose();
     super.dispose();
   }
 }

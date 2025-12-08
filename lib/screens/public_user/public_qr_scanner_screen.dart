@@ -1,19 +1,19 @@
-// lib/screens/field_officer/qr_scanner_screen.dart
+// lib/screens/public_user/public_qr_scanner_screen.dart
 
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../../main.dart';
-import '../../l10n/app_localizations.dart'; // for JalNetraApp.setLocale()
+import '../../l10n/app_localizations.dart';
 
-class QRScannerScreen extends StatefulWidget {
-  const QRScannerScreen({super.key});
+class PublicQRScannerScreen extends StatefulWidget {
+  const PublicQRScannerScreen({super.key});
 
   @override
-  State<QRScannerScreen> createState() => _QRScannerScreenState();
+  State<PublicQRScannerScreen> createState() => _PublicQRScannerScreenState();
 }
 
-class _QRScannerScreenState extends State<QRScannerScreen> {
+class _PublicQRScannerScreenState extends State<PublicQRScannerScreen> {
   final MobileScannerController cameraController = MobileScannerController();
   bool _isPermissionGranted = false;
   bool _isCheckingPermission = true;
@@ -174,6 +174,7 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
             final qrValue = barcodes.first.rawValue ?? "";
             if (qrValue.isNotEmpty) {
               cameraController.stop();
+              // Pass the result back to the calling screen
               Navigator.pop(context, qrValue);
             }
           }

@@ -1,0 +1,383 @@
+// ignore: unused_import
+import 'package:intl/intl.dart' as intl;
+import 'app_localizations.dart';
+
+// ignore_for_file: type=lint
+
+/// The translations for Tamil (`ta`).
+class AppLocalizationsTa extends AppLocalizations {
+  AppLocalizationsTa([String locale = 'ta']) : super(locale);
+
+  @override
+  String get appName => 'ஜல்நேத்ரா';
+
+  @override
+  String get tagline => 'ச마트 நதி நீர்மட்ட கண்காணிப்பு';
+
+  @override
+  String get selectLanguage => 'மொழியைத் தேர்ந்தெடுக்கவும்';
+
+  @override
+  String get roleSelectionTitle => 'உள்நுழைய உங்கள் பங்கைத் தேர்ந்தெடுக்கவும்';
+
+  @override
+  String get proceedToLogin => 'உள்நுழைய தொடரவும்';
+
+  @override
+  String get fieldOfficerLogin => 'புலம் அதிகாரி உள்நுழைவு';
+
+  @override
+  String get supervisorLogin => 'மேற்பார்வையாளரின் உள்நுழைவு';
+
+  @override
+  String get analystLogin => 'பகுப்பாய்வாளர் உள்நுழைவு';
+
+  @override
+  String get adminLogin => 'நிர்வாகி உள்நுழைவு';
+
+  @override
+  String get emailOrUserId => 'மின்னஞ்சல் அல்லது பயனர் ஐடி';
+
+  @override
+  String get password => 'கடவுச்சொல்';
+
+  @override
+  String get login => 'உள்நுழைக';
+
+  @override
+  String get signupQuestion => 'கணக்கு இல்லையா? பதிவு செய்யவும்';
+
+  @override
+  String get loginFailed => 'உள்நுழைவு தோல்வி';
+
+  @override
+  String get invalidCredentials => 'தவறான விவரங்கள். மீண்டும் முயற்சிக்கவும்.';
+
+  @override
+  String get roleMismatch => 'பங்கு பொருந்தவில்லை';
+
+  @override
+  String get roleMismatchMsg => 'உள்நுழைந்த பயனரின் பங்கு தேர்ந்தெடுத்த பங்குடன் பொருந்தவில்லை.';
+
+  @override
+  String get okay => 'சரி';
+
+  @override
+  String get fieldOfficerRegistration => 'புலம் அதிகாரி பதிவு';
+
+  @override
+  String get supervisorRegistration => 'மேற்பார்வையாளர் பதிவு';
+
+  @override
+  String get analystRegistration => 'பகுப்பாய்வாளர் பதிவு';
+
+  @override
+  String get adminRegistration => 'நிர்வாகி பதிவு';
+
+  @override
+  String registrationDetails(Object role) {
+    return '$role பங்கு பதிவு விவரங்கள்';
+  }
+
+  @override
+  String get fullName => 'முழு பெயர்';
+
+  @override
+  String get officialEmail => 'அதிகாரப்பூர்வ மின்னஞ்சல்';
+
+  @override
+  String get passwordMin => 'கடவுச்சொல் (குறைந்தது 6 எழுத்துகள்)';
+
+  @override
+  String get employeeId => 'பணியாளர் ஐடி';
+
+  @override
+  String get phoneNumber => 'தொலைபேசி எண்';
+
+  @override
+  String get department => 'துறை';
+
+  @override
+  String get designation => 'பதவி';
+
+  @override
+  String get adminCode => 'நிர்வாக அங்கீகார குறியீடு';
+
+  @override
+  String get registerAccount => 'கணக்கை பதிவு செய்யவும்';
+
+  @override
+  String get backToLogin => 'ஏற்கனவே கணக்கு உள்ளதா? உள்நுழைய திரும்பவும்';
+
+  @override
+  String get registrationSuccessful => 'பதிவு வெற்றிகரமாக நிறைவு';
+
+  @override
+  String accountCreatedMsg(Object role) {
+    return '$role பங்கு கணக்கு உருவாக்கப்பட்டுள்ளது. தயவுசெய்து உள்நுழைக.';
+  }
+
+  @override
+  String get registrationFailed => 'பதிவு தோல்வி';
+
+  @override
+  String get emailInUse => 'இந்த மின்னஞ்சல் ஏற்கனவே பதிவு செய்யப்பட்டுள்ளது.';
+
+  @override
+  String get weakPassword => 'கடவுச்சொல் பலவீனமாக உள்ளது.';
+
+  @override
+  String get unexpectedError => 'எதிர்பாராத பிழை. மீண்டும் முயற்சிக்கவும்.';
+
+  @override
+  String get authorizationFailed => 'அங்கீகாரம் தோல்வி';
+
+  @override
+  String get invalidAdminCode => 'தவறான நிர்வாக குறியீடு — செல்லுபடியாகும் குறியீடு தேவை.';
+
+  @override
+  String get dashboardTitleOfficer => 'புலம் பணியாளர் கட்டுப்பாடு';
+
+  @override
+  String get dashboardTitleAnalyst => 'ஜல்நேத்ரா - பகுப்பாய்வு';
+
+  @override
+  String get dashboardTitleAdmin => 'நிர்வாக கட்டுப்பாடு';
+
+  @override
+  String get checkWeather => 'வானிலை பார்க்க';
+
+  @override
+  String get viewProfile => 'சுயவிவரம் பார்க்க';
+
+  @override
+  String get logout => 'வெளியேறு';
+
+  @override
+  String get locationUnavailable => 'இடம் கிடைக்கவில்லை — GPS/அனுமதிகளைச் சரிபார்க்கவும்.';
+
+  @override
+  String get profile => 'சுயவிவரம்';
+
+  @override
+  String get userNotLoggedIn => 'பயனர் உள்நுழைக்கப்படவில்லை.';
+
+  @override
+  String get profileFetchError => 'பயனர் தரவை பெறுவதில் பிழை:';
+
+  @override
+  String get userProfile => 'பயனர் சுயவிவரம்';
+
+  @override
+  String get email => 'மின்னஞ்சல்';
+
+  @override
+  String get phone => 'தொலைபேசி';
+
+  @override
+  String get editProfile => 'சுயவிவரம் திருத்து';
+
+  @override
+  String get editFeaturePending => 'சுயவிவரம் திருத்தும் அம்சம் விரைவில் வருகிறது.';
+
+  @override
+  String get fetchingWeather => 'நேரடி வானிலை தரவு பெறப்படுகிறது...';
+
+  @override
+  String get mapPlaceholder => 'நேரடி புவி-கண்காணிப்பு';
+
+  @override
+  String get mapPlaceholderSub => 'நேரடி இடம் மற்றும் தள ஜியோ-வேலி.';
+
+  @override
+  String get captureReading => 'நிர்ணயத்தை பதிவு செய்';
+
+  @override
+  String get step => 'படி';
+
+  @override
+  String get getLiveLocation => 'நேரடி இருப்பிடத்தை பெற';
+
+  @override
+  String get gpsFound => 'GPS கிடைக்கிறது';
+
+  @override
+  String get awaitingGps => 'GPS தேடப்படுகிறது...';
+
+  @override
+  String get proceedToQrScan => 'QR ஸ்கேனுக்கு செல்லவும்';
+
+  @override
+  String get retryGps => 'GPS மீண்டும் முயற்சி';
+
+  @override
+  String get scanQrCode => 'தள QR குறியீட்டை ஸ்கேன் செய்';
+
+  @override
+  String get scanInstruction => 'கேஜ் தூணில் உள்ள QR லேபிளை ஸ்கேன் செய்க.';
+
+  @override
+  String get startQrScanner => 'QR ஸ்கேனர் ஆரம்பி';
+
+  @override
+  String get validatingPosition => 'இடம் சரிபார்க்கப்படுகிறது...';
+
+  @override
+  String get geofencePassed => 'புவி-வேலி சரி';
+
+  @override
+  String get geofenceFailed => 'புவி-வேலி தோல்வி';
+
+  @override
+  String get distanceToSite => 'தளத்திற்கான தூரம்';
+
+  @override
+  String get proceedToCapture => 'படம் பிடிக்க தொடரவும்';
+
+  @override
+  String get backAndRetry => 'திரும்பி மீண்டும் முயற்சி';
+
+  @override
+  String get launchingCamera => 'கேமரா திறக்கப்படுகிறது';
+
+  @override
+  String get prepareCamera => 'கேஜ் படமெடுப்பதற்கான கேமரா தயாராகிறது...';
+
+  @override
+  String get logReading => 'தரவை பதிவு செய்';
+
+  @override
+  String get imagePreview => 'பிடிக்கப்பட்ட பட முன்னோட்டம்';
+
+  @override
+  String get waterLevel => 'நீர்மட்டம்';
+
+  @override
+  String get levelRequired => 'நீர்மட்டத்தை உள்ளிட வேண்டும்';
+
+  @override
+  String get submitAndEncrypt => 'பதிவை சமர்ப்பித்து குறியாக்கு';
+
+  @override
+  String get readingSubmitted => 'பதிவு வெற்றிகரமாக சேர்க்கப்பட்டது!';
+
+  @override
+  String get submissionFailed => 'பதிவு தோல்வி. பிழை:';
+
+  @override
+  String get missingData => 'தரவு குறைவாக உள்ளது.';
+
+  @override
+  String get photoCancelled => 'படம் எடுப்பு ரத்து — மீண்டும் முயற்சிக்கவும்.';
+
+  @override
+  String get qrCancelled => 'QR ஸ்கேன் ரத்து — GPS-க்கு திரும்புகிறது.';
+
+  @override
+  String get qrProcessingFailed => 'QR செயலாக்கம் தோல்வி.';
+
+  @override
+  String get gpsError => 'GPS பிழை — அனுமதி இயக்கி மீண்டும் முயற்சிக்கவும்.';
+
+  @override
+  String get speechNotAvailable => 'குரல் அங்கீகாரம் கிடைக்கவில்லை.';
+
+  @override
+  String get voiceLevelDetected => 'குரல் மூலம் அளவு உள்ளிடப்பட்டது:';
+
+  @override
+  String get voiceInvalidInput => 'குரல் உள்ளீடு அடையாளம் காணப்படவில்லை.';
+
+  @override
+  String get speechRecognizing => 'அடையாளம் காணப்படுகிறது...';
+
+  @override
+  String get qrScanner => 'QR ஸ்கேனர்';
+
+  @override
+  String get cameraPermissionRequired => 'QR ஸ்கேனுக்கு கேமரா அனுமதி தேவை.';
+
+  @override
+  String get retryPermission => 'அனுமதி மீண்டும் முயற்சி';
+
+  @override
+  String get openSettings => 'அமைப்புகளை திறக்க';
+
+  @override
+  String get cameraDenied => 'கேமரா அனுமதி மறுக்கப்பட்டது.';
+
+  @override
+  String get cameraPermanentlyDenied => 'அனுமதி நிரந்தரமாக மறுக்கப்பட்டது — அமைப்புகளில் இயக்கு.';
+
+  @override
+  String get currentSiteLabel => 'தற்போதைய தளம்';
+
+  @override
+  String get publicUserLogin => 'மக்கள் உள்நுழைவு';
+
+  @override
+  String get publicUserRegistration => 'மக்கள் பதிவு';
+
+  @override
+  String get publicUserDashboard => 'மக்கள் கட்டுப்பாடு';
+
+  @override
+  String get sos => 'SOS';
+
+  @override
+  String get sosAlert => 'SOS எச்சரிக்கை அனுப்பு';
+
+  @override
+  String get sosMessagePrompt => 'உங்கள் அவசர நிலையைச் சுருக்கமாக விளக்கவும்.';
+
+  @override
+  String get yourEmail => 'உங்கள் பதிவு மின்னஞ்சல்';
+
+  @override
+  String get sendSos => 'எச்சரிக்கை அனுப்பு';
+
+  @override
+  String get cancel => 'ரத்து';
+
+  @override
+  String get sosSentSuccess => '🚨 SOS அனுப்பப்பட்டது! உதவி வருகிறது.';
+
+  @override
+  String get sosSentFailure => 'SOS அனுப்புதல் தோல்வி — இணையத்தைச் சரிபார்க்கவும்.';
+
+  @override
+  String get sosDefaultMessage => 'அவசர நிலை கண்டறியப்பட்டது — உதவி தேவை.';
+
+  @override
+  String get message => 'செய்தி';
+
+  @override
+  String get loginRequiredForSos => 'SOS எச்சரிக்கையை அனுப்ப நீங்கள் உள்நுழைந்திருக்க வேண்டும்.';
+
+  @override
+  String get notLoggedIn => 'உள்நுழையவில்லை';
+
+  @override
+  String get dlSuccess => ' DL மாடல் வெற்றி: தானியங்கி வாசிப்பு உருவாக்கப்பட்டது.';
+
+  @override
+  String get dlFailed => '⚠DL மாடல் தோல்வி: படத்தின் முடிவை அணுக முடியவில்லை.';
+
+  @override
+  String get dlApiError => ' DL API பிழை: நிலை குறியீடு';
+
+  @override
+  String get dlProcessingError => 'DL செயலாக்க பிழை: இணைப்பை சரிபார்க்கவும்.';
+
+  @override
+  String get autoWaterLevel => 'தானியங்கி நீர்மட்டம் (DL மாடல்)';
+
+  @override
+  String get manualWaterLevel => 'கைமுறையில் நீர்மட்டம் உள்ளிடுதல்';
+
+  @override
+  String get processingImage => 'படம் செயலாக்கப்படுகிறது...';
+
+  @override
+  String get awaitingDl => 'DL மாடல் முடிவுக்காக காத்திருக்கிறது...';
+}

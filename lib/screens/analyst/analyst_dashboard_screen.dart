@@ -1,5 +1,3 @@
-// lib/screens/analyst/analyst_dashboard_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart'; // Chart library
 import 'package:jalnetra01/common/firebase_service.dart';
@@ -7,9 +5,20 @@ import 'package:jalnetra01/models/reading_model.dart';
 import 'package:jalnetra01/screens/auth/role_selection_screen.dart';
 import 'package:jalnetra01/screens/common/profile_screen.dart';
 import 'package:jalnetra01/screens/analyst/analyst_detail_screen.dart';
+import 'package:jalnetra01/screens/common/water_level_trend_charts.dart';
+
+// --- Constants ---
+const List<String> kWaterSites = [
+  'PUZHAL',
+  'VEERANAM',
+  'CHEMBARAMBAKAM',
+  'CHOLAVARAM',
+  'POONDI',
+];
 
 // --- Data Processor Class ---
 class DashboardData {
+  // ... (omitted for brevity, assume definition is here)
   final int totalReceived;
   final int safeZone;
   final int dangerZones;
@@ -25,6 +34,9 @@ class DashboardData {
   });
 }
 
+// --- Page Index Definition ---
+enum AnalystPage { dashboard, trends, profile }
+
 class AnalystDashboardScreen extends StatefulWidget {
   const AnalystDashboardScreen({super.key});
 
@@ -35,6 +47,14 @@ class AnalystDashboardScreen extends StatefulWidget {
 class _AnalystDashboardScreenState extends State<AnalystDashboardScreen> {
   static const double dangerThreshold = 4.0;
   static const double warningThreshold = 2.5;
+
+  AnalystPage _currentPage = AnalystPage.dashboard;
+  List<WaterReading> _allReadings = [];
+  String _currentSiteFilter = kWaterSites.first; // NEW State for Dropdown
+
+  // -------------------------------------------------------------------
+  // DATA PROCESSING & UI LOGIC
+  // -------------------------------------------------------------------
 
   DashboardData _processReadings(List<WaterReading> allReadings) {
     int total = allReadings.length;
@@ -65,6 +85,7 @@ class _AnalystDashboardScreenState extends State<AnalystDashboardScreen> {
   // NAVIGATION HANDLER
   // -------------------------------------------------------------------
 
+  // ... (omitted _navigateToDetail, assume definition is here)
   void _navigateToDetail(
     BuildContext context,
     DashboardData data, // Receives data object
@@ -111,9 +132,11 @@ class _AnalystDashboardScreenState extends State<AnalystDashboardScreen> {
   // DATA EXPORT LOGIC
   // -------------------------------------------------------------------
 
+  // ... (omitted _exportData, assume definition is here)
   void _exportData(BuildContext context, DashboardData data, String viewKey) {
     List<WaterReading> filteredList;
-    String filename;
+    String filename =
+        'unknown_data'; // Initialized to prevent non-nullable error
 
     // Determine which dataset to export
     if (viewKey == 'dataReceived') {
@@ -168,156 +191,259 @@ class _AnalystDashboardScreenState extends State<AnalystDashboardScreen> {
   }
 
   // -------------------------------------------------------------------
-  // UI BUILDERS
+  // PAGE CONTENT BUILDERS
+  // -------------------------------------------------------------------
+
+  String _getTitle() {
+    switch (_currentPage) {
+      case AnalystPage.dashboard:
+        return 'JALNETRA - Analytics Dashboard';
+      case AnalystPage.trends:
+        return 'Water Level Trends';
+      case AnalystPage.profile:
+        return 'User Profile';
+    }
+  }
+
+  Widget _getBodyWidget(DashboardData data) {
+    switch (_currentPage) {
+      case AnalystPage.dashboard:
+        return _buildDashboardContent(data);
+      case AnalystPage.trends:
+        return _buildTrendsContent();
+      case AnalystPage.profile:
+        return const Center(
+          child: Text("Use the Profile button in the drawer."),
+        );
+    }
+  }
+
+  Widget _buildTrendsContent() {
+    if (_allReadings.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.only(top: 50.0),
+          child: Text(
+            'No verified readings available for trend analysis.',
+            style: TextStyle(fontSize: 18, color: Colors.grey),
+          ),
+        ),
+      );
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // NEW: Site Selection Dropdown
+          _buildSiteDropdown(),
+          const SizedBox(height: 16),
+
+          WaterLevelTrendCharts(
+            allReadings: _allReadings,
+            title:
+                "Analyst Trend Analysis (${_allReadings.length} Total Readings)",
+            selectedSite: _currentSiteFilter, // Pass the filter
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSiteDropdown() {
+    return DropdownButton<String>(
+      value: _currentSiteFilter,
+      dropdownColor: Colors.grey.shade900,
+      onChanged: (String? newValue) {
+        if (newValue != null) {
+          setState(() {
+            _currentSiteFilter = newValue;
+          });
+        }
+      },
+      items: kWaterSites.map((String site) {
+        return DropdownMenuItem<String>(
+          value: site,
+          child: Text(
+            site,
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildDashboardContent(DashboardData data) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(12.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 1. TOP STATS GRID
+          _buildStatsGrid(context, data),
+
+          const SizedBox(height: 20),
+
+          // 2. QUICK INSIGHTS / RADIAL BAR CHART
+          _buildQuickInsights(context, data),
+          const SizedBox(height: 20),
+
+          // 3. DATA RECEIVED LIST (MOCK - Now Static)
+          _buildDataReceivedList(context, data),
+        ],
+      ),
+    );
+  }
+  // -------------------------------------------------------------------
+  // MAIN BUILD METHOD
   // -------------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('JALNETRA - Analytics'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.person),
-            tooltip: 'Profile',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ProfileScreen()),
-              );
-            },
+    return StreamBuilder<List<WaterReading>>(
+      stream: FirebaseService().getAllVerifiedReadings(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
+        }
+
+        _allReadings = snapshot.data ?? [];
+        final data = _processReadings(_allReadings);
+
+        return Scaffold(
+          appBar: AppBar(
+            title: Text(_getTitle()),
+            actions: [
+              // Logout is kept in the AppBar actions for consistent UI
+              IconButton(
+                icon: const Icon(Icons.logout),
+                tooltip: 'Logout',
+                onPressed: () async {
+                  await FirebaseService().signOut();
+                  if (context.mounted) {
+                    Navigator.pushAndRemoveUntil(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const RoleSelectionScreen(),
+                      ),
+                      (route) => false,
+                    );
+                  }
+                },
+              ),
+            ],
           ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'Logout',
-            onPressed: () async {
-              await FirebaseService().signOut();
-              if (context.mounted) {
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const RoleSelectionScreen(),
+
+          // --- Drawer ---
+          drawer: _buildDrawer(context),
+
+          body: _getBodyWidget(data),
+        );
+      },
+    );
+  }
+
+  // -------------------------------------------------------------------
+  // DRAWER IMPLEMENTATION
+  // -------------------------------------------------------------------
+
+  // ... (omitted _buildDrawer and _buildDrawerItem, assume definition is here)
+  Widget _buildDrawer(BuildContext context) {
+    return Drawer(
+      child: Container(
+        color: Theme.of(context).scaffoldBackgroundColor, // Dark background
+        child: Column(
+          children: <Widget>[
+            const DrawerHeader(
+              decoration: BoxDecoration(
+                color: Color(0xFF1E88E5), // Blue header color
+              ),
+              child: SizedBox(
+                width: double.infinity,
+                child: Text(
+                  'Analyst Menu',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
                   ),
-                  (route) => false,
-                );
-              }
-            },
-          ),
-        ],
-      ),
-      body: StreamBuilder<List<WaterReading>>(
-        stream: FirebaseService().getAllVerifiedReadings(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
-          }
-
-          final data = _processReadings(snapshot.data ?? []);
-
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(12.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 1. TOP STATS GRID
-                _buildStatsGrid(context, data),
-
-                // *** EXPORT BUTTON IS REMOVED FROM HERE ***
-                const SizedBox(height: 20),
-
-                // 2. QUICK INSIGHTS / RADIAL BAR CHART
-                _buildQuickInsights(context, data),
-                const SizedBox(height: 20),
-
-                // 3. DATA RECEIVED LIST (MOCK - Now Static)
-                _buildDataReceivedList(context, data),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  // --- WIDGET: EXPORT OPTIONS DIALOG BUTTON ---
-  Widget _buildExportButton(BuildContext context, DashboardData data) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 12.0),
-      child: OutlinedButton.icon(
-        icon: const Icon(Icons.file_download, color: Colors.white),
-        label: const Text(
-          "Export Data (CSV)",
-          style: TextStyle(color: Colors.white),
-        ),
-        style: OutlinedButton.styleFrom(
-          side: const BorderSide(color: Colors.white38),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        ),
-        onPressed: () {
-          showDialog(
-            context: context,
-            builder: (BuildContext context) {
-              return AlertDialog(
-                title: const Text("Select Data to Export"),
-                content: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _buildExportOption(
-                      context,
-                      data,
-                      "All Received Data",
-                      'dataReceived',
-                    ),
-                    _buildExportOption(
-                      context,
-                      data,
-                      "Safe Zone Data",
-                      'safeZone',
-                    ),
-                    _buildExportOption(
-                      context,
-                      data,
-                      "Warning Zone Data",
-                      'warningsToday',
-                    ),
-                    _buildExportOption(
-                      context,
-                      data,
-                      "Danger Zone Data",
-                      'dangerZones',
-                    ),
-                  ],
                 ),
-              );
-            },
-          );
-        },
+              ),
+            ),
+
+            // Dashboard
+            _buildDrawerItem(
+              AnalystPage.dashboard,
+              Icons.dashboard,
+              'Dashboard',
+            ),
+
+            // Water Level Trends (NEW)
+            _buildDrawerItem(
+              AnalystPage.trends,
+              Icons.show_chart,
+              'Water Level Trends',
+            ),
+
+            // Profile (Moved from AppBar)
+            _buildDrawerItem(AnalystPage.profile, Icons.person, 'Profile'),
+
+            const Spacer(),
+            // Separator/Footer
+            const Padding(
+              padding: EdgeInsets.all(16.0),
+              child: Text(
+                "JALNETRA v1.0",
+                style: TextStyle(color: Colors.white54, fontSize: 12),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  // Helper widget for dialog options
-  Widget _buildExportOption(
-    BuildContext context,
-    DashboardData data,
-    String title,
-    String viewKey,
-  ) {
+  Widget _buildDrawerItem(AnalystPage page, IconData icon, String title) {
+    final isSelected = _currentPage == page;
     return ListTile(
-      title: Text(title),
-      trailing: const Icon(Icons.download),
+      leading: Icon(
+        icon,
+        color: isSelected ? Theme.of(context).primaryColor : Colors.white70,
+      ),
+      title: Text(
+        title,
+        style: TextStyle(
+          color: isSelected ? Theme.of(context).primaryColor : Colors.white,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        ),
+      ),
+      selected: isSelected,
       onTap: () {
-        Navigator.pop(context); // Close dialog
-        _exportData(context, data, viewKey);
+        // If profile is selected, push it (original behavior)
+        if (page == AnalystPage.profile) {
+          Navigator.pop(context); // Close the drawer first
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ProfileScreen()),
+          );
+        } else {
+          // Change the current page state
+          setState(() {
+            _currentPage = page;
+          });
+          Navigator.pop(context); // Close the drawer
+        }
       },
     );
   }
 
   // --- STATS GRID ---
   Widget _buildStatsGrid(BuildContext context, DashboardData data) {
+    // ... (omitted for brevity, assume definition is here)
     return Column(
       children: [
         Row(
@@ -410,6 +536,7 @@ class _AnalystDashboardScreenState extends State<AnalystDashboardScreen> {
 
   // --- QUICK INSIGHTS (RADIAL BAR CHART) ---
   Widget _buildQuickInsights(BuildContext context, DashboardData data) {
+    // ... (omitted for brevity, assume definition is here)
     final total = data.totalReceived.toDouble();
 
     final dangerPercent = total > 0 ? (data.dangerZones / total) * 100 : 0.0;
@@ -523,6 +650,7 @@ class _AnalystDashboardScreenState extends State<AnalystDashboardScreen> {
 
   // --- MOCKED DATA LIST ---
   Widget _buildDataReceivedList(BuildContext context, DashboardData data) {
+    // ... (omitted for brevity, assume definition is here)
     // This mocks the dam-specific structure in the image provided
     List<Map<String, dynamic>> mockDamData = [
       {'name': 'Mettur Dam', 'tmc_filled': 72.0, 'tmc_total': 93.0},

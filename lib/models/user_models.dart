@@ -1,4 +1,5 @@
 // lib/models/user_models.dart
+
 enum UserRole { fieldOfficer, supervisor, admin, analyst, publicUser }
 
 class AppUser {

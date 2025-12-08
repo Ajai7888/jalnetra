@@ -1,20 +1,27 @@
-// lib/screens/supervisor/supervisor_dashboard_screen.dart
-
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'package:steganograph/steganograph.dart';
 import 'package:photo_view/photo_view.dart';
-
 import 'package:jalnetra01/common/firebase_service.dart';
 import 'package:jalnetra01/models/reading_model.dart';
 import 'package:jalnetra01/screens/auth/role_selection_screen.dart';
 import 'package:jalnetra01/screens/common/profile_screen.dart';
 import 'package:jalnetra01/screens/supervisor/supervisor_map_view.dart';
 import 'package:jalnetra01/screens/supervisor/supervisor_alerts_view.dart';
+import 'package:jalnetra01/screens/common/water_level_trend_charts.dart';
 
 enum DateFilter { all, today, week, month }
+
+// --- Constants ---
+const List<String> kWaterSites = [
+  'PUZHAL',
+  'VEERANAM',
+  'CHEMBARAMBAKAM',
+  'CHOLAVARAM',
+  'POONDI',
+];
 
 // ----------------------------------------------------------------------
 // MAIN STATEFUL WIDGET
@@ -33,20 +40,27 @@ class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
   DateFilter _currentFilter = DateFilter.all;
 
   // New state to manage the currently displayed section (Drawer navigation)
-  int _selectedIndex = 0; // 0=PENDING, 1=HISTORY, 2=MAP, 3=ALERTS
+  int _selectedIndex =
+      0; // 0=COMMUNITY INPUTS, 1=HISTORY, 2=MAP, 3=ALERTS, 4=TRENDS
 
+  // NEW State for Site Filtering
+  String _currentSiteFilter = kWaterSites.first;
+
+  // 🔑 UPDATED: Renamed the queue and changed the icon for clarity
   final List<String> _pageTitles = [
-    'Verification Queue',
+    'Community Inputs', // 🔑 New primary queue name
     'Verification History',
     'Map View',
     'Alerts & Incidents',
+    'Water Level Trends',
   ];
 
   final List<IconData> _pageIcons = [
-    Icons.pending_actions,
+    Icons.people, // 🔑 New icon emphasizing community source
     Icons.history,
     Icons.map,
     Icons.warning_amber,
+    Icons.show_chart,
   ];
 
   // Function to apply filtering based on the selected criteria
@@ -70,29 +84,30 @@ class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
   Widget _getBodyWidget() {
     switch (_selectedIndex) {
       case 0:
-        return _buildVerificationQueue();
+        // Case 0 now builds the Community Inputs (unverified reports)
+        return _buildCommunityInputsQueue();
       case 1:
         return _buildHistoryView();
       case 2:
         return const SupervisorMapView();
       case 3:
         return const SupervisorAlertsView();
+      case 4: // NEW TRENDS VIEW
+        return _buildTrendView();
       default:
-        return _buildVerificationQueue();
+        return _buildCommunityInputsQueue();
     }
   }
 
   // ----------------------------------------------------------------------
-  // BUILD METHOD (REFRACTORED TO USE DRAWER)
+  // BUILD METHOD
   // ----------------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // 1. Remove DefaultTabController, use standard Scaffold
       appBar: AppBar(
         title: Text('JALNETRA - Supervisor (${_pageTitles[_selectedIndex]})'),
-        // No 'bottom' property here
         actions: [
           // Profile Button
           IconButton(
@@ -202,9 +217,11 @@ class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
 
   // ───────────────── STREAM BUILDERS (USED IN BODY) ─────────────────
 
-  Widget _buildVerificationQueue() {
+  // 🔑 RENAMED: This is the new queue for all unverified inputs.
+  Widget _buildCommunityInputsQueue() {
     return StreamBuilder<List<WaterReading>>(
-      stream: FirebaseService().getPendingVerifications(),
+      stream: FirebaseService()
+          .getCommunityInputs(), // 🔑 Using the renamed method
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
@@ -217,13 +234,16 @@ class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
         final totalSubmissions = 500; // Mocked
         final filteredReadings = _applyFilter(allReadings);
 
+        // Check if the current view is the Community Inputs queue
+        final bool isCommunityQueue = _selectedIndex == 0;
+
         return _buildListBody(
           context,
           filteredReadings,
           allReadings,
           pendingTotal: allReadings.length,
           totalSubmissions: totalSubmissions,
-          isPendingQueue: true,
+          isPendingQueue: isCommunityQueue,
         );
       },
     );
@@ -252,6 +272,79 @@ class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
           isPendingQueue: false,
         );
       },
+    );
+  }
+
+  // ───────────────── TREND VIEW (NEW) ─────────────────
+
+  Widget _buildTrendView() {
+    // Use getAllVerifiedReadings() as trends are typically based on verified data.
+    return StreamBuilder<List<WaterReading>>(
+      stream: FirebaseService().getAllVerifiedReadings(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
+        }
+
+        final readings = snapshot.data ?? [];
+
+        if (readings.isEmpty) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.only(top: 50.0),
+              child: Text(
+                'No verified readings available for trend analysis.',
+                style: TextStyle(fontSize: 18, color: Colors.grey),
+              ),
+            ),
+          );
+        }
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Site Selection Dropdown
+              _buildSiteDropdown(),
+              const SizedBox(height: 16),
+
+              WaterLevelTrendCharts(
+                allReadings: readings,
+                title:
+                    "Supervisor Trend Analysis (${readings.length} Total Readings)",
+                selectedSite: _currentSiteFilter, // Pass the filter
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSiteDropdown() {
+    return DropdownButton<String>(
+      value: _currentSiteFilter,
+      dropdownColor: Colors.grey.shade900,
+      onChanged: (String? newValue) {
+        if (newValue != null) {
+          setState(() {
+            _currentSiteFilter = newValue;
+          });
+        }
+      },
+      items: kWaterSites.map((String site) {
+        return DropdownMenuItem<String>(
+          value: site,
+          child: Text(
+            site,
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+        );
+      }).toList(),
     );
   }
 

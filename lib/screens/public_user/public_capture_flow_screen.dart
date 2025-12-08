@@ -1,4 +1,4 @@
-// lib/screens/field_officer/capture_flow_screen.dart
+// lib/screens/public_user/public_capture_flow_screen.dart
 
 import 'dart:io';
 import 'dart:convert';
@@ -7,7 +7,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:image_picker/image_picker.dart' as picker;
 import 'package:steganograph/steganograph.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:speech_to_text/speech_recognition_result.dart';
@@ -18,9 +18,10 @@ import 'package:jalnetra01/main.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import '../../l10n/app_localizations.dart';
-import 'qr_scanner_screen.dart';
+import 'public_qr_scanner_screen.dart';
 
-// DATA MODELS (Required for Capture Flow)
+// 🔑 LOCAL DATA MODELS
+
 class QRSiteData {
   final String siteId;
   final double latitude;
@@ -47,14 +48,15 @@ class SiteMetrics {
   });
 }
 
-class CaptureFlowScreen extends StatefulWidget {
-  const CaptureFlowScreen({super.key});
+class PublicCaptureFlowScreen extends StatefulWidget {
+  const PublicCaptureFlowScreen({super.key});
 
   @override
-  State<CaptureFlowScreen> createState() => _CaptureFlowScreenState();
+  State<PublicCaptureFlowScreen> createState() =>
+      _PublicCaptureFlowScreenState();
 }
 
-class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
+class _PublicCaptureFlowScreenState extends State<PublicCaptureFlowScreen> {
   int _currentStep = 1;
   final _formKey = GlobalKey<FormState>();
 
@@ -74,7 +76,6 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
   bool _isSubmitting = false;
 
   bool _isDLProcessing = false;
-
   static const String _dlApiUrl =
       'https://ericjeevan-gaugeapidoc.hf.space/predict';
 
@@ -102,8 +103,8 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
     super.dispose();
   }
 
-  // --- Speech-to-Text Logic ---
   Future<bool> _isSecureEnvironmentForLocation() async {
+    // Add any root/jailbreak/emulator checks here if needed
     return true;
   }
 
@@ -177,8 +178,6 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
     _recognizedText = '';
   }
 
-  // --- Geolocation and Geofence Logic ---
-
   Future<void> _checkLiveLocation() async {
     final t = AppLocalizations.of(context)!;
 
@@ -208,17 +207,14 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
       }
 
       _currentPosition = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.bestForNavigation,
-        timeLimit: const Duration(seconds: 15),
+        desiredAccuracy: LocationAccuracy.high,
       );
 
       if (mounted) {
         setState(() => _currentStep = 2);
       }
-    } catch (e) {
-      debugPrint('GPS Error in CaptureFlow: $e');
+    } catch (_) {
       _showSnackBar(t.gpsError, Colors.red);
-      if (mounted) setState(() => _currentStep = 1);
     } finally {
       if (mounted) {
         setState(() => _isCheckingStatus = false);
@@ -237,7 +233,7 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
 
     final result = await Navigator.push<String?>(
       context,
-      MaterialPageRoute(builder: (_) => const QRScannerScreen()),
+      MaterialPageRoute(builder: (_) => const PublicQRScannerScreen()),
     );
 
     if (result == null || result.isEmpty) {
@@ -309,10 +305,8 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
     setState(() {
       _isCheckingStatus = true;
       _isWithinGeofence = false;
-      _distanceFromSite = 0.0;
     });
 
-    // ✅ CORRECT ORDER: lat1, lon1, lat2, lon2
     final distance = Geolocator.distanceBetween(
       _currentPosition!.latitude,
       _currentPosition!.longitude,
@@ -332,17 +326,21 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
   Future<void> _capturePhoto() async {
     final t = AppLocalizations.of(context)!;
 
-    final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(
-      source: ImageSource.camera,
-      imageQuality: 50,
+    final imagePicker = picker.ImagePicker();
+    final pickedFile = await imagePicker.pickImage(
+      source: picker.ImageSource.camera,
+      imageQuality: 50, // you can lower this to 30–40 to speed up upload
+      // maxWidth: 800,          // optional: downscale to speed up
+      // maxHeight: 800,
     );
 
     if (pickedFile != null) {
       setState(() {
         _capturedImage = File(pickedFile.path);
-        _currentStep = 5;
+        _currentStep = 5; // show Log Reading screen immediately
       });
+
+      // 🔹 Run DL in background – no await
       _processImageWithDLModel(_capturedImage!);
     } else {
       _showSnackBar(t.photoCancelled, Colors.orange);
@@ -371,30 +369,16 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
       final streamedResponse = await request.send();
       final response = await http.Response.fromStream(streamedResponse);
 
-      debugPrint('DL API raw response (field officer): ${response.body}');
-
       if (response.statusCode == 200) {
+        debugPrint('DL API raw response: ${response.body}');
         final jsonResponse = jsonDecode(response.body);
 
+        // Your API: {"message":"Water Level is 4.0 Units"}
         String? message;
-        String? error;
-
         if (jsonResponse is Map<String, dynamic>) {
           message = jsonResponse['message']?.toString();
-          error = jsonResponse['error']?.toString();
         }
 
-        // 🔴 Case 1: API sent an error (e.g. "Ruler not detected")
-        if (error != null && error.isNotEmpty) {
-          _showSnackBar(
-            '${t.dlFailed}: $error', // e.g. "DL failed: Ruler not detected"
-            Colors.orange,
-          );
-          debugPrint('DL API error: $error');
-          return;
-        }
-
-        // 🔵 Case 2: normal success – parse water level from "message"
         if (message == null || message.isEmpty) {
           _showSnackBar(t.dlFailed, Colors.orange);
           debugPrint('DL API: message field missing');
@@ -410,7 +394,12 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
           if (mounted) {
             setState(() {
               final value = parsedLevel.toStringAsFixed(2);
-              _autoLevelController.text = value; // auto value only
+              _autoLevelController.text = value; // ✅ Only auto field
+
+              // ❌ REMOVE this part so manual field stays untouched:
+              // if (_levelController.text.trim().isEmpty) {
+              //   _levelController.text = value;
+              // }
             });
           }
           _showSnackBar(t.dlSuccess, Colors.blue);
@@ -490,8 +479,8 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
       final reading = WaterReading(
         id: '',
         siteId: _scannedQRData!.siteId,
-        officerId: user.uid,
-        waterLevel: waterLevel,
+        officerId: user.uid, // Public User's UID
+        waterLevel: waterLevel, // Manual value (possibly auto-filled)
         imageUrl: '',
         location: GeoPoint(
           _currentPosition!.latitude,
@@ -501,7 +490,7 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
         isManual: isManual,
       );
 
-      await _firebaseService.submitReading(reading, encodedImageFile);
+      await _firebaseService.submitPublicReading(reading, encodedImageFile);
 
       if (mounted) {
         _showSnackBar(t.readingSubmitted, Colors.green);
@@ -521,8 +510,6 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
       context,
     ).showSnackBar(SnackBar(content: Text(message), backgroundColor: color));
   }
-
-  // --- UI Builder Methods ---
 
   Widget _buildStepContent() {
     switch (_currentStep) {
@@ -547,14 +534,17 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
   Widget _buildCameraLaunchingUI() {
     final t = AppLocalizations.of(context)!;
 
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const CircularProgressIndicator(),
-          const SizedBox(height: 16),
-          Text(t.prepareCamera),
-        ],
+    return Scaffold(
+      appBar: AppBar(title: Text(t.launchingCamera)),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
+            Text(t.prepareCamera),
+          ],
+        ),
       ),
     );
   }
@@ -579,7 +569,6 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
           onPressed: () {
             if (_currentStep > 1) {
               setState(() => _currentStep--);
-              if (_currentStep == 3) _hasValidatedGeofence = false;
             } else {
               Navigator.pop(context);
             }
@@ -802,9 +791,9 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
                   style: TextStyle(fontSize: 20, color: statusColor),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  '(Required: Max $geofenceLimitMeters m)',
-                  style: const TextStyle(fontSize: 14, color: Colors.grey),
+                const Text(
+                  '(Required: Max 25 m)',
+                  style: TextStyle(fontSize: 14, color: Colors.grey),
                 ),
               ],
             ),
@@ -926,7 +915,7 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
             ),
             const SizedBox(height: 20),
 
-            // Manual entry
+            // Manual Entry Box
             TextFormField(
               controller: _levelController,
               decoration: InputDecoration(

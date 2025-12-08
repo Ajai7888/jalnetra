@@ -1,4 +1,4 @@
-// lib/screens/auth/login_screen.dart
+// lib/screens/auth/login_screen.dart (UPDATED)
 
 import 'package:flutter/material.dart';
 import 'package:jalnetra01/common/custom_button.dart';
@@ -8,8 +8,11 @@ import 'package:jalnetra01/screens/analyst/analyst_dashboard_screen.dart';
 import 'package:jalnetra01/screens/auth/signup_screen.dart';
 import 'package:jalnetra01/screens/field_officer/officer_dashboard_screen.dart';
 import 'package:jalnetra01/screens/supervisor/supervisor_dashboard_screen.dart';
-
+// 🆕 New Import
+import 'package:jalnetra01/screens/public_user/public_dashboard_screen.dart';
+import '../../l10n/app_localizations.dart';
 import '../admin/admin/admin_dashboard.dart';
+import '../../../main.dart';
 
 class LoginScreen extends StatefulWidget {
   final UserRole role;
@@ -26,18 +29,21 @@ class _LoginScreenState extends State<LoginScreen> {
   final FirebaseService _firebaseService = FirebaseService();
   bool _isLoading = false;
 
-  String _getRoleTitle() {
+  String _getRoleTitle(AppLocalizations localization) {
     switch (widget.role) {
       case UserRole.fieldOfficer:
-        return 'Field Officer Login';
+        return localization.fieldOfficerLogin;
       case UserRole.supervisor:
-        return 'Supervisor Login';
+        return localization.supervisorLogin;
       case UserRole.analyst:
-        return 'Analyst Login';
-      case UserRole.admin: // <-- NEW ADMIN TITLE
-        return 'Administrator Login';
+        return localization.analystLogin;
+      case UserRole.admin:
+        return localization.adminLogin;
+      // 🆕 New Role Title
+      case UserRole.publicUser:
+        return localization.publicUserLogin; // Update L10n file
       default:
-        return 'Login';
+        return localization.login;
     }
   }
 
@@ -53,43 +59,42 @@ class _LoginScreenState extends State<LoginScreen> {
       case UserRole.analyst:
         destination = const AnalystDashboardScreen();
         break;
-      case UserRole.admin: // <-- NEW ADMIN ROUTE
+      case UserRole.admin:
         destination = const AdminHomePage();
         break;
+      // 🆕 New Dashboard Navigation
+      case UserRole.publicUser:
+        destination = PublicDashboardScreen(user: user);
+        break;
       default:
-        // Should not happen if data is clean
         return;
     }
 
-    // Check if the user's logged-in role matches the selected role
+    // Role mismatch check
     if (user.role == widget.role) {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => destination),
       );
     } else {
-      _showErrorDialog(
-        "Role Mismatch",
-        "The logged-in user's role does not match the selected role (${widget.role.name}).",
-      );
-      _firebaseService.signOut(); // Force sign out on role mismatch
+      final localization = AppLocalizations.of(context)!;
+      _showErrorDialog(localization.roleMismatch, localization.roleMismatchMsg);
+      _firebaseService.signOut();
     }
   }
 
-  // ... (_showErrorDialog and _handleLogin remain unchanged) ...
-
   void _showErrorDialog(String title, String message) {
+    final localization = AppLocalizations.of(context)!;
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(title),
         content: Text(message),
-        actions: <Widget>[
+        actions: [
           TextButton(
-            child: const Text('Okay'),
-            onPressed: () {
-              Navigator.of(ctx).pop();
-            },
+            child: Text(localization.okay),
+            onPressed: () => Navigator.of(ctx).pop(),
           ),
         ],
       ),
@@ -97,33 +102,64 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _handleLogin() async {
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
 
     final user = await _firebaseService.signIn(email, password);
 
-    setState(() {
-      _isLoading = false;
-    });
+    setState(() => _isLoading = false);
 
     if (user != null) {
       _navigateToDashboard(user);
     } else {
+      final localization = AppLocalizations.of(context)!;
       _showErrorDialog(
-        "Login Failed",
-        "Invalid credentials or user not found. Please try again.",
+        localization.loginFailed,
+        localization.invalidCredentials,
       );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final localization = AppLocalizations.of(context)!;
+
+    Locale currentLocale = Localizations.localeOf(context);
+    String selectedLang = currentLocale.languageCode;
+    Map<String, String> languageMap = {
+      "en": "English",
+      "hi": "हिन्दी",
+      "ta": "தமிழ்",
+    };
+
     return Scaffold(
-      appBar: AppBar(title: Text(_getRoleTitle())),
+      appBar: AppBar(
+        title: Text(_getRoleTitle(localization)),
+        actions: [
+          DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: selectedLang,
+              dropdownColor: Colors.black87,
+              icon: const Icon(Icons.language, color: Colors.white),
+              style: const TextStyle(color: Colors.white),
+              items: languageMap.entries.map((entry) {
+                return DropdownMenuItem<String>(
+                  value: entry.key,
+                  child: Text(entry.value),
+                );
+              }).toList(),
+              onChanged: (newLang) {
+                if (newLang != null) {
+                  JalNetraApp.setLocale(context, Locale(newLang));
+                }
+              },
+            ),
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
       body: Padding(
         padding: const EdgeInsets.all(24.0),
         child: Column(
@@ -132,29 +168,33 @@ class _LoginScreenState extends State<LoginScreen> {
           children: [
             TextFormField(
               controller: _emailController,
-              decoration: const InputDecoration(
-                labelText: 'Email or User ID',
-                prefixIcon: Icon(Icons.person_outline),
+              decoration: InputDecoration(
+                labelText: localization.emailOrUserId,
+                prefixIcon: const Icon(Icons.person_outline),
               ),
               keyboardType: TextInputType.emailAddress,
             ),
             const SizedBox(height: 20),
             TextFormField(
               controller: _passwordController,
-              decoration: const InputDecoration(
-                labelText: 'Password',
-                prefixIcon: Icon(Icons.lock_outline),
+              decoration: InputDecoration(
+                labelText: localization.password,
+                prefixIcon: const Icon(Icons.lock_outline),
               ),
               obscureText: true,
             ),
             const SizedBox(height: 40),
+
             _isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : CustomButton(text: 'Login', onPressed: _handleLogin),
+                : CustomButton(
+                    text: localization.login,
+                    onPressed: _handleLogin,
+                  ),
+
             const SizedBox(height: 20),
             TextButton(
               onPressed: () {
-                // Navigate to the new sign-up screen
                 Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -162,7 +202,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 );
               },
-              child: const Text('Don\'t have an account? Sign Up'),
+              child: Text(localization.signupQuestion),
             ),
           ],
         ),

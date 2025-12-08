@@ -6,33 +6,36 @@ import 'package:jalnetra01/common/firebase_service.dart';
 import 'package:jalnetra01/common/loading_screen.dart';
 import 'package:jalnetra01/models/user_models.dart';
 
+import '../../../main.dart';
+import '../../l10n/app_localizations.dart';
+
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final localization = AppLocalizations.of(context)!;
     final user = FirebaseAuth.instance.currentUser;
 
     if (user == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Profile')),
-        body: const Center(child: Text("User not logged in.")),
+        appBar: AppBar(title: Text(localization.profile)),
+        body: Center(child: Text(localization.userNotLoggedIn)),
       );
     }
 
-    // Fetch the detailed profile data from Firestore
     return FutureBuilder<AppUser?>(
       future: FirebaseService().getUserData(user.uid),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const LoadingScreen();
         }
-        if (snapshot.hasError || !snapshot.hasData || snapshot.data == null) {
+        if (snapshot.hasError || snapshot.data == null) {
           return Scaffold(
-            appBar: AppBar(title: const Text('Profile')),
+            appBar: AppBar(title: Text(localization.profile)),
             body: Center(
               child: Text(
-                "Error fetching user data: ${snapshot.error ?? 'Profile missing.'}",
+                "${localization.profileFetchError} ${snapshot.error ?? ""}",
               ),
             ),
           );
@@ -40,8 +43,37 @@ class ProfileScreen extends StatelessWidget {
 
         final appUser = snapshot.data!;
 
+        Locale currentLocale = Localizations.localeOf(context);
+        String selectedLang = currentLocale.languageCode;
+        Map<String, String> languageMap = {
+          "en": "English",
+          "hi": "हिन्दी",
+          "ta": "தமிழ்",
+        };
+
         return Scaffold(
-          appBar: AppBar(title: const Text('User Profile')),
+          appBar: AppBar(
+            title: Text(localization.userProfile),
+            actions: [
+              DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: selectedLang,
+                  dropdownColor: Colors.black87,
+                  icon: const Icon(Icons.language, color: Colors.white),
+                  style: const TextStyle(color: Colors.white),
+                  items: languageMap.entries.map((e) {
+                    return DropdownMenuItem(value: e.key, child: Text(e.value));
+                  }).toList(),
+                  onChanged: (newLang) {
+                    if (newLang != null) {
+                      JalNetraApp.setLocale(context, Locale(newLang));
+                    }
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+            ],
+          ),
           body: SingleChildScrollView(
             padding: const EdgeInsets.all(20.0),
             child: Column(
@@ -65,7 +97,8 @@ class ProfileScreen extends StatelessWidget {
                 ),
                 Center(
                   child: Text(
-                    appUser.role.toString().split('.').last.toUpperCase(),
+                    // Keep role in English (as you requested)
+                    appUser.role.name.toUpperCase(),
                     style: TextStyle(
                       fontSize: 18,
                       color: Theme.of(context).primaryColor,
@@ -74,31 +107,38 @@ class ProfileScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 30),
 
-                // Detailed Information Card
                 Card(
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildProfileRow(Icons.mail, "Email", appUser.email),
+                        _buildProfileRow(
+                          Icons.mail,
+                          localization.email,
+                          appUser.email,
+                        ),
                         _buildProfileRow(
                           Icons.badge,
-                          "Employee ID",
+                          localization.employeeId,
                           appUser.employeeId,
                         ),
                         if (appUser.phone != null)
-                          _buildProfileRow(Icons.phone, "Phone", appUser.phone),
+                          _buildProfileRow(
+                            Icons.phone,
+                            localization.phone,
+                            appUser.phone,
+                          ),
                         if (appUser.department != null)
                           _buildProfileRow(
                             Icons.apartment,
-                            "Department",
+                            localization.department,
                             appUser.department,
                           ),
                         if (appUser.designation != null)
                           _buildProfileRow(
                             Icons.military_tech,
-                            "Designation",
+                            localization.designation,
                             appUser.designation,
                           ),
                       ],
@@ -108,15 +148,12 @@ class ProfileScreen extends StatelessWidget {
                 const SizedBox(height: 20),
                 ElevatedButton.icon(
                   onPressed: () {
-                    // Placeholder for edit functionality
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Profile edit feature coming soon.'),
-                      ),
+                      SnackBar(content: Text(localization.editFeaturePending)),
                     );
                   },
                   icon: const Icon(Icons.edit),
-                  label: const Text('Edit Profile'),
+                  label: Text(localization.editProfile),
                 ),
               ],
             ),

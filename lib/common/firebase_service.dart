@@ -87,7 +87,6 @@ class FirebaseService {
     try {
       final doc = await _firestore.collection('users').doc(uid).get();
       if (doc.exists) {
-        // Safe casting for fromMap constructor
         final data = doc.data() as Map<String, dynamic>;
         data['id'] = doc.id;
         return AppUser.fromMap(data);
@@ -99,9 +98,39 @@ class FirebaseService {
     }
   }
 
+  // ───────── SOS IMPLEMENTATION ─────────
+
+  Future<void> sendSosNotification({
+    required String userEmail,
+    required String message,
+  }) async {
+    try {
+      final currentUserId = _auth.currentUser?.uid;
+
+      if (currentUserId == null) {
+        throw Exception("SOS sender is not authenticated.");
+      }
+
+      await _firestore.collection('sos_alerts').add({
+        'senderId': currentUserId,
+        'senderEmail': userEmail,
+        'message': message,
+        'timestamp': FieldValue.serverTimestamp(),
+        'status': 'New',
+        'alertedRoles': [
+          UserRole.fieldOfficer.toString().split('.').last,
+          UserRole.supervisor.toString().split('.').last,
+        ],
+      });
+      debugPrint('✅ SOS Alert logged by $userEmail');
+    } catch (e) {
+      debugPrint('🔥 SOS Notification Error: $e');
+      rethrow;
+    }
+  }
+
   // ───────── ADMIN USER MANAGEMENT ─────────
 
-  /// Gets a stream of users filtered by their role (for Field Officer/Supervisor/Analyst pages).
   Stream<List<AppUser>> getUsersByRole(UserRole role) {
     final roleString = role.toString().split('.').last;
     return _firestore
@@ -117,7 +146,6 @@ class FirebaseService {
         );
   }
 
-  /// Gets a stream of users whose accounts are not yet verified by an Admin (for Approval Page).
   Stream<List<AppUser>> getUnverifiedUsers() {
     return _firestore
         .collection('users')
@@ -132,25 +160,47 @@ class FirebaseService {
         );
   }
 
-  /// Removes the user's profile from Firestore. (Note: Full Auth deletion requires Admin SDK/Cloud Function).
   Future<void> removeUser(String userId) async {
     await _firestore.collection('users').doc(userId).delete();
   }
 
-  /// Updates a user's role and verification status.
   Future<void> updateUserRole(
     String uid,
     UserRole newRole,
     bool isVerified,
   ) async {
     await _firestore.collection('users').doc(uid).update({
-      'role': newRole.toString().split('.').last, // Save as string
+      'role': newRole.toString().split('.').last,
       'isAccountVerified': isVerified,
     });
   }
 
-  // ───────── READING SUBMISSION (FIXED) ─────────
+  // ───────── READING SUBMISSION (OFFICER + PUBLIC) ─────────
+
+  /// Field Officer / internal flow → writes to /readings
   Future<void> submitReading(WaterReading reading, File photoFile) async {
+    await _submitReadingToCollection(
+      collectionName: 'readings',
+      reading: reading,
+      photoFile: photoFile,
+    );
+  }
+
+  /// Public flow → writes to /public_readings
+  Future<void> submitPublicReading(WaterReading reading, File photoFile) async {
+    await _submitReadingToCollection(
+      collectionName: 'public_readings',
+      reading: reading,
+      photoFile: photoFile,
+    );
+  }
+
+  /// Shared logic for uploading file + creating Firestore doc
+  Future<void> _submitReadingToCollection({
+    required String collectionName,
+    required WaterReading reading,
+    required File photoFile,
+  }) async {
     try {
       // 0. Make sure user is logged in
       final user = FirebaseAuth.instance.currentUser;
@@ -162,14 +212,11 @@ class FirebaseService {
         );
       }
 
-      // --- ENHANCEMENT: Structured File Naming ---
-
       // 1. Sanitize file path components
       final safeSiteId = reading.siteId
           .replaceAll(RegExp(r'[#\[\]\.\/\\]'), '')
           .trim();
 
-      // ⚠️ FIX: Use a robust regex to keep only alphanumeric characters for the timestamp/filename segment.
       final safeTimestamp = DateTime.now().toIso8601String().replaceAll(
         RegExp(r'[^a-zA-Z0-9]'),
         '',
@@ -177,7 +224,7 @@ class FirebaseService {
 
       final officerIdForFile = user.uid;
       final fileName = '${officerIdForFile}_$safeTimestamp.jpg';
-      final filePath = 'readings/$safeSiteId/$fileName';
+      final filePath = '$collectionName/$safeSiteId/$fileName';
 
       debugPrint('📤 Uploading to: $filePath');
 
@@ -193,26 +240,25 @@ class FirebaseService {
       final downloadUrl = await snapshot.ref.getDownloadURL();
       debugPrint('✅ Uploaded. URL: $downloadUrl');
 
-      // 3. Save Firestore doc
+      // 3. Save Firestore doc in the given collection
+      //    Use a single CREATE (set) so it matches rules (no extra update).
+      final docRef = _firestore.collection(collectionName).doc();
+
       final finalReadingMap = WaterReading(
-        id: '',
+        id: docRef.id,
         siteId: reading.siteId,
         officerId: reading.officerId,
         waterLevel: reading.waterLevel,
         imageUrl: downloadUrl,
         location: reading.location,
         timestamp: reading.timestamp,
-        isVerified: false,
+        isVerified: false, // new readings always unverified
         isManual: reading.isManual,
       ).toMap();
 
-      final docRef = await _firestore
-          .collection('readings')
-          .add(finalReadingMap);
-
-      await docRef.update({'id': docRef.id});
+      await docRef.set(finalReadingMap);
     } on FirebaseException catch (e, st) {
-      debugPrint('🔥 Firebase Storage error');
+      debugPrint('🔥 Firebase Storage/Firestore error');
       debugPrint('  code   : ${e.code}');
       debugPrint('  message: ${e.message}');
       debugPrint('  plugin : ${e.plugin}');
@@ -226,9 +272,9 @@ class FirebaseService {
   }
 
   // ───────── SUPERVISOR / ANALYST ─────────
-  // ... (all other methods remain the same) ...
 
-  Stream<List<WaterReading>> getPendingVerifications() {
+  /// Stream for the 'Community Inputs' queue (unverified readings from OFFICERS).
+  Stream<List<WaterReading>> getCommunityInputs() {
     return _firestore
         .collection('readings')
         .where('isVerified', isEqualTo: false)

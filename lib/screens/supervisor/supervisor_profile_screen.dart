@@ -139,6 +139,7 @@ class SupervisorProfileScreen extends StatelessWidget {
   // ---------- Helper: single row (icon + title + value) ----------
 
   Widget _buildProfileRow(IconData icon, String title, String? value) {
+    // 🔑 FIX: Return immediately if null, otherwise return the Padding widget.
     if (value == null) return const SizedBox.shrink();
 
     return Padding(
@@ -186,9 +187,9 @@ class SupervisorProfileScreen extends StatelessWidget {
             ),
             const SizedBox(height: 12),
 
-            // Pending verifications
+            // Pending verifications (now using Community Inputs stream)
             StreamBuilder<List<WaterReading>>(
-              stream: service.getPendingVerifications(),
+              stream: service.getCommunityInputs(),
               builder: (context, snapshot) {
                 final pendingCount = snapshot.data?.length ?? 0;
                 return _buildStatChip(

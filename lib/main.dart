@@ -1,37 +1,54 @@
 // lib/main.dart
-import 'package:firebase_core/firebase_core.dart';
+
 import 'package:flutter/material.dart';
-import 'package:jalnetra01/screens/auth/role_selection_screen.dart';
-import 'package:jalnetra01/utils/theme.dart';
-import 'package:firebase_app_check/firebase_app_check.dart'; // NEW IMPORT
-import 'package:flutter/foundation.dart'; // NEW IMPORT for kDebugMode check
+import 'package:flutter/foundation.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
 
 import 'firebase_options.dart';
+import 'package:jalnetra01/utils/theme.dart';
+import 'package:jalnetra01/screens/auth/role_selection_screen.dart';
+
+// 🌍 Localization imports
+import 'l10n/app_localizations.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 void main() async {
-  // 1. Ensure Flutter bindings are initialized
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 2. Initialize Firebase
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  // 3. Initialize Firebase App Check (Crucial for security)
   await FirebaseAppCheck.instance.activate(
-    // Use the Play Integrity provider for Android production builds
-    // In development, use AndroidProvider.debug to generate a token for the console.
     androidProvider: kDebugMode
         ? AndroidProvider.debug
         : AndroidProvider.playIntegrity,
-
-    // For iOS, you would use DeviceCheck or App Attest
-    // appleProvider: kDebugMode ? AppleProvider.debug : AppleProvider.deviceCheck,
   );
 
   runApp(const JalNetraApp());
 }
 
-class JalNetraApp extends StatelessWidget {
+class JalNetraApp extends StatefulWidget {
   const JalNetraApp({super.key});
+
+  // 🔥 Allow screens to change language dynamically
+  static void setLocale(BuildContext context, Locale newLocale) {
+    final _JalNetraAppState? state = context
+        .findAncestorStateOfType<_JalNetraAppState>();
+    state?.updateLocale(newLocale);
+  }
+
+  @override
+  State<JalNetraApp> createState() => _JalNetraAppState();
+}
+
+class _JalNetraAppState extends State<JalNetraApp> {
+  Locale _locale = const Locale('en'); // default English
+
+  void updateLocale(Locale locale) {
+    setState(() {
+      _locale = locale;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -39,6 +56,21 @@ class JalNetraApp extends StatelessWidget {
       title: 'JalNetra',
       theme: AppTheme.darkTheme,
       debugShowCheckedModeBanner: false,
+
+      // 🌍 Here we activate localization
+      locale: _locale,
+      supportedLocales: const [
+        Locale('en'), // English
+        Locale('hi'), // Hindi
+        Locale('ta'), // Tamil
+      ],
+      localizationsDelegates: const [
+        AppLocalizations.delegate, // from ARB files
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+
       home: const RoleSelectionScreen(),
     );
   }
