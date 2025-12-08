@@ -7,7 +7,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:image_picker/image_picker.dart'; // Still needed for XFile type
 import 'package:steganograph/steganograph.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:speech_to_text/speech_recognition_result.dart';
@@ -18,7 +18,9 @@ import 'package:jalnetra01/main.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import '../../l10n/app_localizations.dart';
+import 'live_gauge_validation_screen.dart';
 import 'qr_scanner_screen.dart';
+import 'package:camera/camera.dart';
 
 // DATA MODELS (Required for Capture Flow)
 class QRSiteData {
@@ -75,6 +77,10 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
 
   bool _isDLProcessing = false;
 
+  /// NEW: DL result status (for “not gauge” message)
+  bool _isGaugeImage = true;
+  String? _gaugeValidationMessage;
+
   static const String _dlApiUrl =
       'https://ericjeevan-gaugeapidoc.hf.space/predict';
 
@@ -85,12 +91,24 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
   bool _isListening = false;
   String _recognizedText = '';
 
+  List<CameraDescription> _cameras = [];
+
+  // ⚠️ NEW METHOD: Initialize cameras list
+  Future<void> _initializeCameras() async {
+    try {
+      _cameras = await availableCameras();
+    } catch (e) {
+      debugPrint("Error initializing available cameras: $e");
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     _initSpeech();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkLiveLocation();
+      _initializeCameras(); // Initialize cameras early
     });
   }
 
@@ -102,7 +120,7 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
     super.dispose();
   }
 
-  // --- Speech-to-Text Logic ---
+  // --- Speech-to-Text Logic (UNCHANGED) ---
   Future<bool> _isSecureEnvironmentForLocation() async {
     return true;
   }
@@ -177,7 +195,7 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
     _recognizedText = '';
   }
 
-  // --- Geolocation and Geofence Logic ---
+  // --- Geolocation and Geofence Logic (UNCHANGED) ---
 
   Future<void> _checkLiveLocation() async {
     final t = AppLocalizations.of(context)!;
@@ -312,7 +330,6 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
       _distanceFromSite = 0.0;
     });
 
-    // ✅ CORRECT ORDER: lat1, lon1, lat2, lon2
     final distance = Geolocator.distanceBetween(
       _currentPosition!.latitude,
       _currentPosition!.longitude,
@@ -329,31 +346,55 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
     }
   }
 
+  // 🚀 STEP 4: Capture Photo (Launches Live Validation)
   Future<void> _capturePhoto() async {
     final t = AppLocalizations.of(context)!;
 
-    final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(
-      source: ImageSource.camera,
-      imageQuality: 50,
+    if (_cameras.isEmpty) {
+      _showSnackBar(
+        "Camera not available. Retrying initialization...",
+        Colors.red,
+      );
+      await _initializeCameras(); // Attempt to initialize cameras again
+      if (_cameras.isEmpty) {
+        if (mounted) setState(() => _currentStep = 3);
+        return;
+      }
+    }
+
+    // Navigate to the live validation screen
+    final XFile? pickedFile = await Navigator.push<XFile?>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => LiveCameraValidationScreen(cameras: _cameras),
+      ),
     );
 
     if (pickedFile != null) {
       setState(() {
         _capturedImage = File(pickedFile.path);
         _currentStep = 5;
+        _autoLevelController.clear();
+        _isGaugeImage = true;
+        _gaugeValidationMessage = null;
       });
+      // 🎯 DL API call (Step 5 logic) for data extraction
       _processImageWithDLModel(_capturedImage!);
     } else {
+      // If the user presses the back button on the validation screen, it returns null.
       _showSnackBar(t.photoCancelled, Colors.orange);
       if (mounted) setState(() => _currentStep = 3);
     }
   }
 
+  // 🎯 DL API call (Step 5 logic) for data extraction
   Future<void> _processImageWithDLModel(File imageFile) async {
     final t = AppLocalizations.of(context)!;
 
     _autoLevelController.clear();
+    _isGaugeImage = true;
+    _gaugeValidationMessage = null;
+
     setState(() => _isDLProcessing = true);
 
     try {
@@ -384,20 +425,32 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
           error = jsonResponse['error']?.toString();
         }
 
-        // 🔴 Case 1: API sent an error (e.g. "Ruler not detected")
+        // 🔴 Case 1: API sent an error (e.g. "Ruler not detected" / "Could not parse image result")
         if (error != null && error.isNotEmpty) {
-          _showSnackBar(
-            '${t.dlFailed}: $error', // e.g. "DL failed: Ruler not detected"
-            Colors.orange,
-          );
           debugPrint('DL API error: $error');
+
+          // Mark as NOT a gauge image
+          setState(() {
+            _isGaugeImage = false;
+            _gaugeValidationMessage =
+                'No gauge detected in this image. Please recapture the water-level gauge.';
+          });
+
+          _showSnackBar('${t.dlFailed}: No gauge detected.', Colors.orange);
           return;
         }
 
         // 🔵 Case 2: normal success – parse water level from "message"
         if (message == null || message.isEmpty) {
-          _showSnackBar(t.dlFailed, Colors.orange);
           debugPrint('DL API: message field missing');
+
+          setState(() {
+            _isGaugeImage = false;
+            _gaugeValidationMessage =
+                'No gauge detected in this image. Please recapture the water-level gauge.';
+          });
+
+          _showSnackBar('${t.dlFailed}: No gauge detected.', Colors.orange);
           return;
         }
 
@@ -411,12 +464,20 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
             setState(() {
               final value = parsedLevel.toStringAsFixed(2);
               _autoLevelController.text = value; // auto value only
+              _isGaugeImage = true;
+              _gaugeValidationMessage = null;
             });
           }
           _showSnackBar(t.dlSuccess, Colors.blue);
         } else {
-          _showSnackBar(t.dlFailed, Colors.orange);
+          // No usable number even though "message" exists -> treat as not gauge
           debugPrint('DL API: could not parse number from message: $message');
+          setState(() {
+            _isGaugeImage = false;
+            _gaugeValidationMessage =
+                'No gauge detected in this image. Please recapture the water-level gauge.';
+          });
+          _showSnackBar('${t.dlFailed}: No gauge detected.', Colors.orange);
         }
       } else {
         _showSnackBar('${t.dlApiError} ${response.statusCode}', Colors.red);
@@ -547,13 +608,14 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
   Widget _buildCameraLaunchingUI() {
     final t = AppLocalizations.of(context)!;
 
+    // This screen is now just a placeholder before navigating to the live view
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           const CircularProgressIndicator(),
           const SizedBox(height: 16),
-          Text(t.prepareCamera),
+          Text("${t.prepareCamera}\n(Starting Live Validation...)"),
         ],
       ),
     );
@@ -802,9 +864,9 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
                   style: TextStyle(fontSize: 20, color: statusColor),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  '(Required: Max $geofenceLimitMeters m)',
-                  style: const TextStyle(fontSize: 14, color: Colors.grey),
+                const Text(
+                  '(Required: Max 25.0 m)',
+                  style: TextStyle(fontSize: 14, color: Colors.grey),
                 ),
               ],
             ),
@@ -899,6 +961,42 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
                       ),
                     ),
             ),
+
+            /// 🔴 NEW: Big warning when the image is not a gauge
+            if (!_isGaugeImage && _gaugeValidationMessage != null) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.redAccent),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      Icons.warning_amber_rounded,
+                      color: Colors.redAccent,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _gaugeValidationMessage!,
+                        style: const TextStyle(
+                          color: Colors.redAccent,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
             const SizedBox(height: 20),
 
             // Automatic DL Entry Box

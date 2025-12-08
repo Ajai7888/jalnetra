@@ -15,8 +15,6 @@ import '../../l10n/app_localizations.dart';
 import '../common/WeatherScreen.dart';
 import '../../../main.dart';
 
-// NOTE: Assuming WeatherData is correctly defined and accessible for the weather logic.
-
 class OfficerDashboardScreen extends StatefulWidget {
   const OfficerDashboardScreen({super.key});
 
