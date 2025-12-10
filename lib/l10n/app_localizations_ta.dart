@@ -380,4 +380,58 @@ class AppLocalizationsTa extends AppLocalizations {
 
   @override
   String get awaitingDl => 'DL மாடல் முடிவுக்காக காத்திருக்கிறது...';
+
+  @override
+  String get liveTitle => 'நேரடி சரிபார்ப்பு';
+
+  @override
+  String get liveInitMessage => 'கேமரா துவங்கப்படுகிறது...';
+
+  @override
+  String get liveInitVoice => 'கேமரா துவங்குகிறது, தயவு செய்து காத்திருக்கவும்.';
+
+  @override
+  String get liveNoCamera => 'இந்த சாதனத்தில் கேமரா கிடைக்கவில்லை.';
+
+  @override
+  String get liveCameraError => 'கேமரா துவங்குவதில் பிழை. தயவு செய்து மீண்டும் முயற்சிக்கவும்.';
+
+  @override
+  String get liveChecking => 'சரிபார்க்கிறது...';
+
+  @override
+  String get liveAimAtGauge => 'கேஜ் மீது கேமராவை நிலையாக வைத்து காட்டு...';
+
+  @override
+  String get liveCameraReadyVoice => 'கேமரா தயார். நீர்மட்ட கேஜ் மீது கேமராவை வைத்து நிலையாக பிடியுங்கள்.';
+
+  @override
+  String get liveGaugeNotFound => 'கேஜ் தெரியவில்லை';
+
+  @override
+  String get liveFrameError => 'சரிபார்ப்பதில் பிழை. மீண்டும் முயற்சிக்கவும்.';
+
+  @override
+  String get liveGaugeNotDetectedAim => 'கேஜ் கண்டுபிடிக்க முடியவில்லை. கேமராவை கேஜ் மீது வைத்து நிலையாக பிடியுங்கள்.';
+
+  @override
+  String get liveTooFarOverlay => 'சற்றுக் அருகே வாருங்கள்';
+
+  @override
+  String get liveTooFarBottom => 'கேஜ் கண்டுபிடிக்கப்பட்டது, ஆனால் நீங்கள் தூரத்தில் இருக்கிறீர்கள். தயவு செய்து அருகே வாருங்கள்.';
+
+  @override
+  String get liveReadyOverlay => 'கேஜ் கிடைத்தது - படம் எடுக்கலாம்';
+
+  @override
+  String get liveReadyBottom => 'கேஜ் சரியாக உள்ளது. நிலையாக பிடித்து capture பொத்தானை அழுத்துங்கள்.';
+
+  @override
+  String get liveNetworkError => 'சரிபார்ப்பின் போது நெட்வொர்க் பிழை ஏற்பட்டது.';
+
+  @override
+  String get liveCaptureSuccess => 'படம் வெற்றிகரமாக எடுக்கப்பட்டது.';
+
+  @override
+  String get liveCaptureError => 'படம் எடுப்பதில் பிழை ஏற்பட்டது. மீண்டும் முயற்சிக்கவும்.';
 }

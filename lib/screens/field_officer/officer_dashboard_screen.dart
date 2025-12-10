@@ -1,7 +1,8 @@
 // lib/screens/field_officer/officer_dashboard_screen.dart
 
 import 'dart:convert';
-import 'package:firebase_auth/firebase_auth.dart'; // Needed for SOS sender email
+
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
@@ -104,7 +105,8 @@ class _OfficerDashboardScreenState extends State<OfficerDashboardScreen> {
     double lon,
   ) async {
     final url = Uri.parse(
-      'https://api.openweathermap.org/data/2.5/weather?lat=$lat&lon=$lon&units=metric&appid=$_apiKey',
+      'https://api.openweathermap.org/data/2.5/weather'
+      '?lat=$lat&lon=$lon&units=metric&appid=$_apiKey',
     );
 
     try {
@@ -129,7 +131,6 @@ class _OfficerDashboardScreenState extends State<OfficerDashboardScreen> {
             ? 70
             : 0;
 
-        // NOTE: Dynamic return type used to match the existing code's flexibility
         return WeatherData(
           weatherIcon: icon(data['weather'][0]['id']),
           temperature: data['main']['temp'],
@@ -180,7 +181,7 @@ class _OfficerDashboardScreenState extends State<OfficerDashboardScreen> {
     ).showSnackBar(SnackBar(content: Text(message), backgroundColor: color));
   }
 
-  // 🚨 NEW: SOS Logic Implementation
+  // 🚨 SOS Logic
   void _showSosDialog(BuildContext context, AppLocalizations t) {
     showDialog(
       context: context,
@@ -202,13 +203,15 @@ class _OfficerDashboardScreenState extends State<OfficerDashboardScreen> {
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  '${t.yourEmail}: ${_currentUser?.email ?? t.notLoggedIn}', // Get email from FirebaseAuth
+                  '${t.yourEmail}: ${_currentUser?.email ?? t.notLoggedIn}',
                   style: const TextStyle(fontSize: 12, color: Colors.grey),
                 ),
                 const SizedBox(height: 10),
                 Text(
                   _currentPosition != null
-                      ? 'Location will be shared: Lat ${_currentPosition!.latitude.toStringAsFixed(4)}, Lon ${_currentPosition!.longitude.toStringAsFixed(4)}'
+                      ? 'Location will be shared: '
+                            'Lat ${_currentPosition!.latitude.toStringAsFixed(4)}, '
+                            'Lon ${_currentPosition!.longitude.toStringAsFixed(4)}'
                       : 'WARNING: Location is unavailable and cannot be shared.',
                   style: TextStyle(
                     fontSize: 12,
@@ -300,7 +303,7 @@ class _OfficerDashboardScreenState extends State<OfficerDashboardScreen> {
                 ),
                 const Divider(color: Colors.white24),
 
-                // 🚨 NEW: SOS Button relocated inside the Drawer (Menu Bar)
+                // SOS Button
                 Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 16.0,
@@ -311,7 +314,7 @@ class _OfficerDashboardScreenState extends State<OfficerDashboardScreen> {
                     child: ElevatedButton.icon(
                       onPressed: _isLocationAvailable && _currentUser != null
                           ? () {
-                              Navigator.pop(context); // Close drawer
+                              Navigator.pop(context);
                               _showSosDialog(context, t);
                             }
                           : null,
@@ -482,7 +485,7 @@ class _OfficerDashboardScreenState extends State<OfficerDashboardScreen> {
             ),
           ),
 
-          // Current location pill (like your mock)
+          // Current location pill
           Positioned(
             top: 20,
             left: 20,

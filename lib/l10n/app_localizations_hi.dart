@@ -380,4 +380,58 @@ class AppLocalizationsHi extends AppLocalizations {
 
   @override
   String get awaitingDl => 'DL मॉडल परिणाम की प्रतीक्षा...';
+
+  @override
+  String get liveTitle => 'लाइव वेलिडेशन';
+
+  @override
+  String get liveInitMessage => 'कैमरा शुरू हो रहा है...';
+
+  @override
+  String get liveInitVoice => 'कैमरा शुरू हो रहा है, कृपया प्रतीक्षा करें।';
+
+  @override
+  String get liveNoCamera => 'इस डिवाइस में कैमरा नहीं मिला।';
+
+  @override
+  String get liveCameraError => 'कैमरा शुरू करते समय त्रुटि हुई। कृपया वापस जाकर फिर कोशिश करें।';
+
+  @override
+  String get liveChecking => 'जाँच जारी है...';
+
+  @override
+  String get liveAimAtGauge => 'गेज पर कैमरा स्थिर रखें...';
+
+  @override
+  String get liveCameraReadyVoice => 'कैमरा तैयार है। कृपया पानी के गेज पर कैमरा रखकर फोन को स्थिर रखें।';
+
+  @override
+  String get liveGaugeNotFound => 'गेज नहीं मिला';
+
+  @override
+  String get liveFrameError => 'फ्रेम को वेलिडेट नहीं कर सके। कृपया पुनः प्रयास करें।';
+
+  @override
+  String get liveGaugeNotDetectedAim => 'गेज नहीं पहचाना गया। गेज पर कैमरा रखें और स्थिर रखें।';
+
+  @override
+  String get liveTooFarOverlay => 'थोड़ा पास आइए';
+
+  @override
+  String get liveTooFarBottom => 'गेज दिख रहा है, लेकिन आप दूर हैं। कृपया थोड़ा पास आइए।';
+
+  @override
+  String get liveReadyOverlay => 'गेज मिला - कैप्चर कर सकते हैं';
+
+  @override
+  String get liveReadyBottom => 'गेज सही है। फोन को स्थिर रखें और कैप्चर बटन दबाएँ।';
+
+  @override
+  String get liveNetworkError => 'वेलिडेशन के दौरान नेटवर्क त्रुटि हुई।';
+
+  @override
+  String get liveCaptureSuccess => 'फोटो सफलतापूर्वक कैप्चर हो गई।';
+
+  @override
+  String get liveCaptureError => 'फोटो कैप्चर करते समय त्रुटि हुई। कृपया फिर से प्रयास करें।';
 }

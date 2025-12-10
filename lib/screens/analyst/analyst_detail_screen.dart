@@ -2,10 +2,10 @@
 
 import 'package:flutter/material.dart';
 import 'package:jalnetra01/models/reading_model.dart';
-import 'package:path_provider/path_provider.dart'; // Import for file paths
-import 'dart:io'; // Import for File operations
-import 'package:csv/csv.dart'; // Import for CSV conversion
-import 'package:share_plus/share_plus.dart'; // Import for sharing files
+import 'package:csv/csv.dart'; // For CSV conversion
+
+// NEW: platform-aware export helper
+import 'package:jalnetra01/utils/export_utils.dart';
 
 class AnalystDetailScreen extends StatelessWidget {
   final String title;
@@ -31,6 +31,7 @@ class AnalystDetailScreen extends StatelessWidget {
       return;
     }
 
+    // Inform user that export started
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Preparing ${title.toLowerCase()} data for export...'),
@@ -40,50 +41,40 @@ class AnalystDetailScreen extends StatelessWidget {
 
     try {
       // 1. Prepare CSV data
-      List<List<dynamic>> csvData = [];
-      // Add header row
+      final List<List<dynamic>> csvData = [];
+
+      // Header row
       csvData.add(['Site ID', 'Water Level (m)', 'Timestamp', 'Is Verified']);
-      // Add reading data
+
+      // Rows
       for (var reading in readings) {
         csvData.add([
           reading.siteId,
           reading.waterLevel.toStringAsFixed(2),
-          reading.timestamp.toLocal().toIso8601String().substring(
-            0,
-            16,
-          ), // Format timestamp
-          reading.isVerified ? 'Yes' : 'No', // Assuming isVerified is a field
+          reading.timestamp.toLocal().toIso8601String().substring(0, 16),
+          reading.isVerified ? 'Yes' : 'No',
         ]);
       }
 
-      String csvString = const ListToCsvConverter().convert(csvData);
+      final String csvString = const ListToCsvConverter().convert(csvData);
 
-      // 2. Get a temporary directory to store the file
-      final directory = await getTemporaryDirectory();
+      // 2. Filename for export
       final filename = '${title.toLowerCase().replaceAll(' ', '_')}_data.csv';
-      final filePath = '${directory.path}/$filename';
-      final file = File(filePath);
 
-      // 3. Write CSV string to the file
-      await file.writeAsString(csvString);
+      // 3. Use platform-aware helper
+      await saveAndShareCsv(
+        filename: filename,
+        csvContent: csvString,
+        shareText: 'JALNETRA: $title data export.',
+      );
 
-      // 4. Show success bar AND trigger native share sheet
+      // 4. Success message
       if (context.mounted) {
-        // Show success bar first
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              'Successfully exported ${readings.length} records. Sharing file...',
-            ),
+            content: Text('Successfully exported ${readings.length} records.'),
             backgroundColor: statusColor.withOpacity(0.8),
           ),
-        );
-
-        // Then open the share sheet
-        await Share.shareXFiles(
-          [XFile(filePath)],
-          text: 'JALNETRA: ${title} data export.',
-          subject: 'Water Reading Data',
         );
       }
     } catch (e) {
@@ -95,7 +86,9 @@ class AnalystDetailScreen extends StatelessWidget {
           ),
         );
       }
-      print('Error exporting data: $e'); // Log the error for debugging
+      // For debugging
+      // ignore: avoid_print
+      print('Error exporting data: $e');
     }
   }
 
@@ -106,15 +99,10 @@ class AnalystDetailScreen extends StatelessWidget {
         title: Text(title),
         backgroundColor: statusColor.withOpacity(0.8),
         actions: [
-          // EXPORT BUTTON
           IconButton(
-            icon: const Icon(
-              Icons.file_download,
-              color: Colors.white,
-            ), // Changed icon to share
+            icon: const Icon(Icons.file_download, color: Colors.white),
             tooltip: 'Export & Share Data',
-            onPressed: () =>
-                _exportAndShareData(context), // Call the new function
+            onPressed: () => _exportAndShareData(context),
           ),
         ],
       ),
@@ -150,7 +138,6 @@ class AnalystDetailScreen extends StatelessWidget {
                     ),
                     isThreeLine: true,
                     onTap: () {
-                      // Optional: Navigate to a single reading detail view
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text(

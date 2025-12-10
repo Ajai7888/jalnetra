@@ -13,6 +13,7 @@ import 'package:jalnetra01/screens/public_user/public_dashboard_screen.dart';
 import '../../l10n/app_localizations.dart';
 import '../admin/admin/admin_dashboard.dart';
 import '../../../main.dart';
+import '../field_officer/field_officer_home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   final UserRole role;
@@ -51,7 +52,7 @@ class _LoginScreenState extends State<LoginScreen> {
     Widget destination;
     switch (user.role) {
       case UserRole.fieldOfficer:
-        destination = const OfficerDashboardScreen();
+        destination = const FieldOfficerHomeScreen();
         break;
       case UserRole.supervisor:
         destination = const SupervisorDashboardScreen();

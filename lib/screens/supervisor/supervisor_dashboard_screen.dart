@@ -1,9 +1,11 @@
-import 'dart:typed_data';
+// lib/screens/supervisor/supervisor_dashboard_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'package:steganograph/steganograph.dart';
 import 'package:photo_view/photo_view.dart';
+
 import 'package:jalnetra01/common/firebase_service.dart';
 import 'package:jalnetra01/models/reading_model.dart';
 import 'package:jalnetra01/screens/auth/role_selection_screen.dart';
@@ -12,9 +14,10 @@ import 'package:jalnetra01/screens/supervisor/supervisor_map_view.dart';
 import 'package:jalnetra01/screens/supervisor/supervisor_alerts_view.dart';
 import 'package:jalnetra01/screens/common/water_level_trend_charts.dart';
 
+import '../../jalnetra_storage_image.dart';
+
 enum DateFilter { all, today, week, month }
 
-// --- Constants ---
 const List<String> kWaterSites = [
   'PUZHAL',
   'VEERANAM',
@@ -22,10 +25,6 @@ const List<String> kWaterSites = [
   'CHOLAVARAM',
   'POONDI',
 ];
-
-// ----------------------------------------------------------------------
-// MAIN STATEFUL WIDGET
-// ----------------------------------------------------------------------
 
 class SupervisorDashboardScreen extends StatefulWidget {
   const SupervisorDashboardScreen({super.key});
@@ -36,19 +35,15 @@ class SupervisorDashboardScreen extends StatefulWidget {
 }
 
 class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
-  // State to manage date filtering (used within the stream builders)
   DateFilter _currentFilter = DateFilter.all;
 
-  // New state to manage the currently displayed section (Drawer navigation)
-  int _selectedIndex =
-      0; // 0=COMMUNITY INPUTS, 1=HISTORY, 2=MAP, 3=ALERTS, 4=TRENDS
+  // 0 = COMMUNITY INPUTS, 1 = HISTORY, 2 = MAP, 3 = ALERTS, 4 = TRENDS
+  int _selectedIndex = 0;
 
-  // NEW State for Site Filtering
   String _currentSiteFilter = kWaterSites.first;
 
-  // 🔑 UPDATED: Renamed the queue and changed the icon for clarity
   final List<String> _pageTitles = [
-    'Community Inputs', // 🔑 New primary queue name
+    'Community Inputs',
     'Verification History',
     'Map View',
     'Alerts & Incidents',
@@ -56,35 +51,50 @@ class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
   ];
 
   final List<IconData> _pageIcons = [
-    Icons.people, // 🔑 New icon emphasizing community source
+    Icons.people,
     Icons.history,
     Icons.map,
     Icons.warning_amber,
     Icons.show_chart,
   ];
 
-  // Function to apply filtering based on the selected criteria
+  /// 🔧 Helper to fix old/bad Firebase Storage URLs (used for network calls)
+  String _fixImageUrl(String url) {
+    var fixed = url.trim();
+
+    fixed = fixed.replaceFirst(
+      'jalnetra-44a79.firebasestorage.app',
+      'jalnetra-44a79.appspot.com',
+    );
+
+    fixed = fixed.replaceFirst('firebasestorage.app', 'appspot.com');
+
+    return fixed;
+  }
+
+  // Apply date filter
   List<WaterReading> _applyFilter(List<WaterReading> readings) {
     final now = DateTime.now();
 
     return readings.where((r) {
       final diff = now.difference(r.timestamp).inDays;
-      if (_currentFilter == DateFilter.today) {
-        return diff == 0;
-      } else if (_currentFilter == DateFilter.week) {
-        return diff < 7;
-      } else if (_currentFilter == DateFilter.month) {
-        return diff < 30;
+      switch (_currentFilter) {
+        case DateFilter.today:
+          return diff == 0;
+        case DateFilter.week:
+          return diff < 7;
+        case DateFilter.month:
+          return diff < 30;
+        case DateFilter.all:
+        default:
+          return true;
       }
-      return true; // DateFilter.all
     }).toList();
   }
 
-  // --- Widget for the current body content ---
   Widget _getBodyWidget() {
     switch (_selectedIndex) {
       case 0:
-        // Case 0 now builds the Community Inputs (unverified reports)
         return _buildCommunityInputsQueue();
       case 1:
         return _buildHistoryView();
@@ -92,16 +102,12 @@ class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
         return const SupervisorMapView();
       case 3:
         return const SupervisorAlertsView();
-      case 4: // NEW TRENDS VIEW
+      case 4:
         return _buildTrendView();
       default:
         return _buildCommunityInputsQueue();
     }
   }
-
-  // ----------------------------------------------------------------------
-  // BUILD METHOD
-  // ----------------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
@@ -109,7 +115,6 @@ class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
       appBar: AppBar(
         title: Text('JALNETRA - Supervisor (${_pageTitles[_selectedIndex]})'),
         actions: [
-          // Profile Button
           IconButton(
             icon: const Icon(Icons.person),
             tooltip: 'Profile',
@@ -120,7 +125,6 @@ class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
               );
             },
           ),
-          // Logout Button
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Logout',
@@ -139,28 +143,21 @@ class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
           ),
         ],
       ),
-
-      // 2. Add Drawer (The new menu bar)
       drawer: _buildDrawer(context),
-
-      // 3. Body shows the selected widget
       body: _getBodyWidget(),
     );
   }
 
-  // ───────────────── DRAWER IMPLEMENTATION ─────────────────
+  // ───────── DRAWER ─────────
 
   Widget _buildDrawer(BuildContext context) {
     return Drawer(
       child: Container(
-        color: Theme.of(context).scaffoldBackgroundColor, // Dark background
+        color: Theme.of(context).scaffoldBackgroundColor,
         child: Column(
           children: <Widget>[
-            // Drawer Header
             DrawerHeader(
-              decoration: BoxDecoration(
-                color: Theme.of(context).primaryColor.withOpacity(0.1),
-              ),
+              decoration: BoxDecoration(color: Theme.of(context).primaryColor),
               child: const SizedBox(
                 width: double.infinity,
                 child: Text(
@@ -173,8 +170,6 @@ class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
                 ),
               ),
             ),
-
-            // Navigation List Items
             for (int i = 0; i < _pageTitles.length; i++)
               ListTile(
                 leading: Icon(
@@ -193,15 +188,11 @@ class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
                 ),
                 selected: _selectedIndex == i,
                 onTap: () {
-                  setState(() {
-                    _selectedIndex = i;
-                  });
-                  Navigator.pop(context); // Close the drawer
+                  setState(() => _selectedIndex = i);
+                  Navigator.pop(context);
                 },
               ),
-
             const Spacer(),
-            // Separator/Footer
             const Padding(
               padding: EdgeInsets.all(16.0),
               child: Text(
@@ -215,13 +206,11 @@ class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
     );
   }
 
-  // ───────────────── STREAM BUILDERS (USED IN BODY) ─────────────────
+  // ───────── COMMUNITY INPUTS (PENDING QUEUE) ─────────
 
-  // 🔑 RENAMED: This is the new queue for all unverified inputs.
   Widget _buildCommunityInputsQueue() {
     return StreamBuilder<List<WaterReading>>(
-      stream: FirebaseService()
-          .getCommunityInputs(), // 🔑 Using the renamed method
+      stream: FirebaseService().getCommunityInputs(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
@@ -231,23 +220,19 @@ class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
         }
 
         final allReadings = snapshot.data ?? [];
-        final totalSubmissions = 500; // Mocked
         final filteredReadings = _applyFilter(allReadings);
-
-        // Check if the current view is the Community Inputs queue
-        final bool isCommunityQueue = _selectedIndex == 0;
 
         return _buildListBody(
           context,
           filteredReadings,
           allReadings,
-          pendingTotal: allReadings.length,
-          totalSubmissions: totalSubmissions,
-          isPendingQueue: isCommunityQueue,
+          isPendingQueue: true,
         );
       },
     );
   }
+
+  // ───────── HISTORY VIEW (VERIFIED) ─────────
 
   Widget _buildHistoryView() {
     return StreamBuilder<List<WaterReading>>(
@@ -261,24 +246,21 @@ class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
         }
 
         final allReadings = snapshot.data ?? [];
-        final totalSubmissions = 500; // Mocked
         final filteredReadings = _applyFilter(allReadings);
 
         return _buildListBody(
           context,
           filteredReadings,
           allReadings,
-          totalSubmissions: totalSubmissions,
           isPendingQueue: false,
         );
       },
     );
   }
 
-  // ───────────────── TREND VIEW (NEW) ─────────────────
+  // ───────── TRENDS VIEW ─────────
 
   Widget _buildTrendView() {
-    // Use getAllVerifiedReadings() as trends are typically based on verified data.
     return StreamBuilder<List<WaterReading>>(
       stream: FirebaseService().getAllVerifiedReadings(),
       builder: (context, snapshot) {
@@ -308,15 +290,13 @@ class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Site Selection Dropdown
               _buildSiteDropdown(),
               const SizedBox(height: 16),
-
               WaterLevelTrendCharts(
                 allReadings: readings,
                 title:
                     "Supervisor Trend Analysis (${readings.length} Total Readings)",
-                selectedSite: _currentSiteFilter, // Pass the filter
+                selectedSite: _currentSiteFilter,
               ),
             ],
           ),
@@ -331,9 +311,7 @@ class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
       dropdownColor: Colors.grey.shade900,
       onChanged: (String? newValue) {
         if (newValue != null) {
-          setState(() {
-            _currentSiteFilter = newValue;
-          });
+          setState(() => _currentSiteFilter = newValue);
         }
       },
       items: kWaterSites.map((String site) {
@@ -348,23 +326,24 @@ class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
     );
   }
 
-  // ───────────────── COMMON LIST BODY ─────────────────
+  // ───────── COMMON LIST BODY ─────────
 
   Widget _buildListBody(
     BuildContext context,
     List<WaterReading> filteredReadings,
     List<WaterReading> allReadings, {
-    int pendingTotal = 0,
-    required int totalSubmissions,
     required bool isPendingQueue,
   }) {
     if (filteredReadings.isEmpty) {
-      return const Center(
+      return Center(
         child: Padding(
-          padding: EdgeInsets.only(top: 50.0),
+          padding: const EdgeInsets.only(top: 50.0),
           child: Text(
-            'No readings for this period.',
-            style: TextStyle(fontSize: 18, color: Colors.grey),
+            isPendingQueue
+                ? 'No community inputs pending verification for this period.'
+                : 'No verified history for this period.',
+            style: const TextStyle(fontSize: 18, color: Colors.grey),
+            textAlign: TextAlign.center,
           ),
         ),
       );
@@ -375,20 +354,8 @@ class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // System Overview is only displayed in the PENDING tab (index 0)
-          if (_selectedIndex == 0)
-            _buildSystemOverview(
-              pendingTotal,
-              filteredReadings.length,
-              totalSubmissions,
-            ),
-
-          const SizedBox(height: 20),
-          // Only show filter for the PENDING and HISTORY tabs
           if (_selectedIndex <= 1) _buildFilterDropdown(),
           const SizedBox(height: 10),
-
-          // Verification List
           ...filteredReadings
               .map(
                 (reading) => _buildVerificationCard(
@@ -399,7 +366,6 @@ class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
                 ),
               )
               .toList(),
-
           const SizedBox(height: 20),
           _buildRecentActivity(),
         ],
@@ -407,7 +373,7 @@ class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
     );
   }
 
-  // ───────────────── FILTER DROPDOWN ─────────────────
+  // ───────── DATE FILTER DROPDOWN ─────────
 
   Widget _buildFilterDropdown() {
     return DropdownButton<DateFilter>(
@@ -415,9 +381,7 @@ class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
       dropdownColor: Colors.grey.shade900,
       onChanged: (DateFilter? newValue) {
         if (newValue != null) {
-          setState(() {
-            _currentFilter = newValue;
-          });
+          setState(() => _currentFilter = newValue);
         }
       },
       items: DateFilter.values.map((DateFilter filter) {
@@ -429,52 +393,7 @@ class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
     );
   }
 
-  // ───────────────── OVERVIEW CARD ─────────────────
-
-  Widget _buildSystemOverview(
-    int pendingTotal,
-    int pendingFiltered,
-    int totalSubmissions,
-  ) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              "SYSTEM OVERVIEW",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            _buildStatRow(
-              "TOTAL SUBMISSIONS (Lifetime)",
-              totalSubmissions.toString(),
-            ),
-            _buildStatRow("TOTAL PENDING (All Time)", pendingTotal.toString()),
-            _buildStatRow("PENDING (Filtered)", pendingFiltered.toString()),
-            _buildStatRow("ACTIVE SITES", "187 (Mock)"),
-            _buildStatRow("OFFLINE SITES", "5 (Mock)"),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatRow(String title, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(title, style: const TextStyle(color: Colors.grey)),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
-        ],
-      ),
-    );
-  }
-
-  // ───────────────── FORENSIC HELPER FUNCTIONS ─────────────────
+  // ───────── FORENSIC HELPERS ─────────
 
   WaterReading? _getPreviousReading(
     WaterReading current,
@@ -488,22 +407,21 @@ class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
         )
         .toList();
 
-    if (previousReadings.isEmpty) {
-      return null;
-    }
+    if (previousReadings.isEmpty) return null;
 
     return previousReadings.reduce(
       (a, b) => a.timestamp.isAfter(b.timestamp) ? a : b,
     );
   }
 
-  /// Downloads the image from [imageUrl], extracts the hidden message,
-  /// and returns it as a key-value map.
   Future<Map<String, String>> _decodeStegMetadataFromUrl(
     String imageUrl,
   ) async {
     try {
-      final resp = await http.get(Uri.parse(imageUrl));
+      // 🔧 ensure URL is valid before calling the server
+      final fixedUrl = _fixImageUrl(imageUrl);
+
+      final resp = await http.get(Uri.parse(fixedUrl));
       if (resp.statusCode != 200) {
         return {"Error": 'Failed to download image: ${resp.statusCode}'};
       }
@@ -530,27 +448,29 @@ class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
     }
   }
 
-  /// Displays the full-screen zoomable image when the thumbnail is tapped.
   void _showFullImage(BuildContext context, String imageUrl) {
+    final fixedUrl = _fixImageUrl(imageUrl);
+
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => Scaffold(
           appBar: AppBar(title: const Text("Gauge Image Forensics")),
           body: PhotoView(
-            imageProvider: NetworkImage(imageUrl),
-            heroAttributes: PhotoViewHeroAttributes(tag: imageUrl),
+            imageProvider: NetworkImage(fixedUrl),
+            heroAttributes: PhotoViewHeroAttributes(tag: fixedUrl),
           ),
         ),
       ),
     );
   }
 
-  /// Shows a dialog with decoded steganography details.
   Future<void> _showStegDetailsDialog(
     BuildContext context,
     WaterReading reading,
   ) async {
+    if (!context.mounted) return;
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -567,71 +487,69 @@ class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
         stegLevel = double.tryParse(numPart);
       }
 
-      if (context.mounted) {
-        Navigator.pop(context); // close loading dialog
+      if (!context.mounted) return;
+      Navigator.pop(context); // close loading
 
-        showDialog(
-          context: context,
-          builder: (_) {
-            return AlertDialog(
-              title: const Text('Embedded Image Metadata'),
-              content: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Status: ${meta['Error'] ?? 'Decryption Successful'}',
-                      style: TextStyle(
-                        color: meta.containsKey('Error')
-                            ? Colors.red
-                            : Colors.green,
-                      ),
+      showDialog(
+        context: context,
+        builder: (_) {
+          return AlertDialog(
+            title: const Text('Embedded Image Metadata'),
+            content: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Status: ${meta['Error'] ?? 'Decryption Successful'}',
+                    style: TextStyle(
+                      color: meta.containsKey('Error')
+                          ? Colors.red
+                          : Colors.green,
                     ),
-                    const SizedBox(height: 8),
-                    Text('SiteID (Steg): ${meta['SiteID'] ?? 'N/A'}'),
-                    Text('Officer Email: ${meta['OfficerEmail'] ?? 'N/A'}'),
-                    const Divider(),
+                  ),
+                  const SizedBox(height: 8),
+                  Text('SiteID (Steg): ${meta['SiteID'] ?? 'N/A'}'),
+                  Text('Officer Email: ${meta['OfficerEmail'] ?? 'N/A'}'),
+                  const Divider(),
+                  Text(
+                    'Water Level (DB): ${reading.waterLevel.toStringAsFixed(2)} m',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  Text(
+                    'Water Level (Steg): ${meta['Level'] ?? 'N/A'}',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  if (stegLevel != null)
                     Text(
-                      'Water Level (DB): ${reading.waterLevel.toStringAsFixed(2)} m',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
+                      'Difference: ${(reading.waterLevel - stegLevel).toStringAsFixed(3)} m',
                     ),
-                    Text(
-                      'Water Level (Steg): ${meta['Level'] ?? 'N/A'}',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    if (stegLevel != null)
-                      Text(
-                        'Difference: ${(reading.waterLevel - stegLevel).toStringAsFixed(3)} m',
-                      ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Live GPS (Steg): ${meta['GeoLiveLat'] ?? 'N/A'}, ${meta['GeoLiveLon'] ?? 'N/A'}',
-                    ),
-                    Text('Timestamp (Steg): ${meta['Timestamp'] ?? 'N/A'}'),
-                  ],
-                ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Live GPS (Steg): ${meta['GeoLiveLat'] ?? 'N/A'}, ${meta['GeoLiveLon'] ?? 'N/A'}',
+                  ),
+                  Text('Timestamp (Steg): ${meta['Timestamp'] ?? 'N/A'}'),
+                ],
               ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Close'),
-                ),
-              ],
-            );
-          },
-        );
-      }
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Close'),
+              ),
+            ],
+          );
+        },
+      );
     } catch (e) {
-      if (context.mounted) {
-        Navigator.pop(context); // close loading dialog
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to initialize dialog: $e')),
-        );
-      }
+      if (!context.mounted) return;
+      Navigator.pop(context); // close loading
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to initialize dialog: $e')),
+      );
     }
   }
 
-  // ───────────────── SINGLE READING CARD ─────────────────
+  // ───────── SINGLE READING CARD ─────────
 
   Widget _buildVerificationCard(
     BuildContext context,
@@ -639,20 +557,26 @@ class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
     List<WaterReading> allReadings, {
     required bool isPendingQueue,
   }) {
-    // Get previous reading details for comparison
     final prevReading = _getPreviousReading(reading, allReadings);
-
     final dateFormat = DateFormat('yyyy-MM-dd hh:mm a');
     final FirebaseService service = FirebaseService();
 
-    // Determine status badge color and text
     final bool isApproved = reading.isVerified;
-    final statusColor = isPendingQueue
-        ? Colors.transparent
-        : (isApproved ? Colors.green : Colors.red);
-    final statusText = isPendingQueue
-        ? "PENDING"
-        : (isApproved ? "APPROVED" : "REJECTED");
+    final Color statusColor;
+    final String statusText;
+
+    if (isPendingQueue) {
+      statusColor = Colors.orange;
+      statusText = "PENDING";
+    } else {
+      statusColor = isApproved ? Colors.green : Colors.red;
+      statusText = isApproved ? "APPROVED" : "REJECTED";
+    }
+
+    final entryTypeText = reading.isManual ? 'Manual Entry' : 'Automatic (SLV)';
+    final entryTypeColor = reading.isManual
+        ? Colors.amber
+        : const Color(0xFF4CAF50);
 
     return Card(
       clipBehavior: Clip.antiAlias,
@@ -666,37 +590,43 @@ class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
             decoration: BoxDecoration(color: statusColor.withOpacity(0.9)),
             child: Text(
               statusText,
-              style: TextStyle(
-                color: isPendingQueue ? Colors.orange : Colors.white,
+              style: const TextStyle(
+                color: Colors.white,
                 fontWeight: FontWeight.bold,
               ),
             ),
           ),
 
-          // IMAGE PREVIEW (Tap to open full screen)
+          // IMAGE PREVIEW
           GestureDetector(
-            onTap: () => _showFullImage(context, reading.imageUrl),
+            onTap: () {
+              if (reading.imageUrl.isNotEmpty) {
+                _showFullImage(context, reading.imageUrl);
+              }
+            },
             child: Hero(
-              tag: reading.imageUrl, // For smooth transition
+              tag: _fixImageUrl(reading.imageUrl),
               child: SizedBox(
                 height: 180,
                 width: double.infinity,
-                child: Image.network(
-                  reading.imageUrl,
-                  fit: BoxFit.cover,
-                  // NOTE: Original image builders are omitted here, but should be added for robustness
-                ),
+                child: reading.imageUrl.isEmpty
+                    ? const Center(child: Text('No Image'))
+                    : JalnetraStorageImage(
+                        imageUrl: reading.imageUrl,
+                        width: double.infinity,
+                        height: 180,
+                        fit: BoxFit.cover,
+                      ),
               ),
             ),
           ),
 
-          // TEXT + ACTIONS
+          // DETAILS + ACTIONS
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Site ID and Level
                 Text(
                   "Site ID: ${reading.siteId}",
                   style: const TextStyle(
@@ -712,27 +642,36 @@ class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
                     color: Color(0xFF4CAF50),
                   ),
                 ),
-
-                // Historical Comparison
                 if (prevReading != null)
                   Text(
                     "Previous Level: ${prevReading.waterLevel.toStringAsFixed(2)} m (${DateFormat('MMM d').format(prevReading.timestamp)})",
                     style: const TextStyle(color: Colors.grey),
                   ),
+                const SizedBox(height: 6),
+                Text(
+                  "Entry Type: $entryTypeText",
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: entryTypeColor,
+                  ),
+                ),
                 const SizedBox(height: 8),
-
-                // Metadata
+                Text(
+                  "Officer ID: ${reading.officerId}",
+                  style: const TextStyle(color: Colors.grey),
+                ),
                 Text(
                   "Timestamp: ${dateFormat.format(reading.timestamp)}",
                   style: const TextStyle(color: Colors.grey),
                 ),
                 Text(
-                  "Location: Lat:${reading.location.latitude.toStringAsFixed(2)} Lon:${reading.location.longitude.toStringAsFixed(2)}",
+                  "Location: Lat:${reading.location.latitude.toStringAsFixed(2)} "
+                  "Lon:${reading.location.longitude.toStringAsFixed(2)}",
                   style: const TextStyle(color: Colors.grey),
                 ),
                 const SizedBox(height: 12),
 
-                // BUTTON TO DECODE STEGANOGRAPHY METADATA
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton.icon(
@@ -744,7 +683,6 @@ class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
 
                 const SizedBox(height: 8),
 
-                // ACTION BUTTONS (Only visible for PENDING queue)
                 if (isPendingQueue)
                   Row(
                     children: [
@@ -783,7 +721,7 @@ class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
     );
   }
 
-  // ───────────────── RECENT ACTIVITY (MOCK) ─────────────────
+  // ───────── RECENT ACTIVITY (MOCK) ─────────
 
   Widget _buildRecentActivity() {
     return Card(

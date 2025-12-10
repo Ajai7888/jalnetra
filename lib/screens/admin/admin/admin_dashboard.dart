@@ -42,13 +42,12 @@ class AdminHomePage extends StatelessWidget {
               );
             },
           ),
-          // 2. Logout Button (FIXED)
+          // 2. Logout Button
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Logout',
             onPressed: () async {
               await FirebaseService().signOut();
-              // FIX: Replaced Placeholder with actual RoleSelectionScreen
               if (context.mounted) {
                 Navigator.pushAndRemoveUntil(
                   context,
@@ -67,7 +66,7 @@ class AdminHomePage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // --- Welcome Card/Summary ---
+            // --- Title ---
             const Padding(
               padding: EdgeInsets.only(bottom: 20.0),
               child: Text(
@@ -81,6 +80,8 @@ class AdminHomePage extends StatelessWidget {
             ),
 
             // --- Navigation Buttons ---
+
+            // Supervisors
             adminButton(
               context,
               title: "Supervisors",
@@ -88,6 +89,8 @@ class AdminHomePage extends StatelessWidget {
               page: const SupervisorPage(),
             ),
             const SizedBox(height: 20),
+
+            // Field Officers
             adminButton(
               context,
               title: "Field Officers",
@@ -95,6 +98,8 @@ class AdminHomePage extends StatelessWidget {
               page: const FieldOfficerPage(),
             ),
             const SizedBox(height: 20),
+
+            // Analysts
             adminButton(
               context,
               title: "Analysts",
@@ -102,23 +107,19 @@ class AdminHomePage extends StatelessWidget {
               page: const AnalystPage(),
             ),
             const SizedBox(height: 20),
-            adminButton(
-              context,
-              title: "Alerts & Incidents",
-              icon: Icons.notifications_active,
-              page: const AlertsPage(),
-            ),
-            const SizedBox(height: 20),
+
+            // Pending Approvals (highlighted)
             adminButton(
               context,
               title: "Pending Approvals",
               icon: Icons.check_circle_outline,
               page: const UserApprovalPage(),
-              color: Colors.orange.shade700, // Highlight this button
+              color: Colors.orange,
             ),
           ],
         ),
       ),
+      backgroundColor: backgroundDark,
     );
   }
 
@@ -149,7 +150,7 @@ class AdminHomePage extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // FIX: Apply Overflow fix
+          // Left icon & title
           Expanded(
             child: Row(
               children: [
@@ -165,7 +166,7 @@ class AdminHomePage extends StatelessWidget {
               ],
             ),
           ),
-          // FIX: Add the required onPressed parameter
+          // Right button
           ElevatedButton(
             onPressed: navTap,
             style: ElevatedButton.styleFrom(
@@ -203,6 +204,7 @@ class SupervisorPage extends StatelessWidget {
         backgroundColor: appGreen,
         title: const Text("Supervisors"),
       ),
+      backgroundColor: backgroundDark,
       body: StreamBuilder<List<AppUser>>(
         stream: FirebaseService().getUsersByRole(UserRole.supervisor),
         builder: (context, snapshot) {
@@ -235,9 +237,7 @@ class SupervisorPage extends StatelessWidget {
                   (user) => OfficerTile(
                     key: ValueKey(user.id),
                     name: user.name,
-                    siteId:
-                        user.designation ??
-                        'N/A', // Use Designation for siteId placeholder
+                    siteId: user.designation ?? 'N/A',
                     officerId: user.employeeId ?? 'N/A',
                     showRemoveButton: true,
                     userId: user.id,
@@ -265,6 +265,7 @@ class FieldOfficerPage extends StatelessWidget {
         backgroundColor: appGreen,
         title: const Text("Field Officers"),
       ),
+      backgroundColor: backgroundDark,
       body: StreamBuilder<List<AppUser>>(
         stream: FirebaseService().getUsersByRole(UserRole.fieldOfficer),
         builder: (context, snapshot) {
@@ -297,9 +298,7 @@ class FieldOfficerPage extends StatelessWidget {
                   (user) => OfficerTile(
                     key: ValueKey(user.id),
                     name: user.name,
-                    siteId:
-                        user.department ??
-                        'N/A', // Use Department for siteId placeholder
+                    siteId: user.department ?? 'N/A',
                     officerId: user.employeeId ?? 'N/A',
                     showRemoveButton: true,
                     userId: user.id,
@@ -324,6 +323,7 @@ class AnalystPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(backgroundColor: appGreen, title: const Text("Analysts")),
+      backgroundColor: backgroundDark,
       body: StreamBuilder<List<AppUser>>(
         stream: FirebaseService().getUsersByRole(UserRole.analyst),
         builder: (context, snapshot) {
@@ -357,9 +357,7 @@ class AnalystPage extends StatelessWidget {
                     key: ValueKey(user.id),
                     name: user.name,
                     analystId: user.employeeId ?? 'N/A',
-                    region:
-                        user.designation ??
-                        'N/A', // Using Designation as region placeholder
+                    region: user.designation ?? 'N/A',
                     showRemoveButton: true,
                     userId: user.id,
                   ),
@@ -373,7 +371,7 @@ class AnalystPage extends StatelessWidget {
 }
 
 //======================================================
-// 5️⃣ USER APPROVAL PAGE (New Feature)
+// 5️⃣ USER APPROVAL PAGE
 //======================================================
 
 class UserApprovalPage extends StatelessWidget {
@@ -383,9 +381,10 @@ class UserApprovalPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.orange.shade700,
+        backgroundColor: Colors.orange,
         title: const Text("Pending User Approvals"),
       ),
+      backgroundColor: backgroundDark,
       body: StreamBuilder<List<AppUser>>(
         stream: FirebaseService().getUnverifiedUsers(),
         builder: (context, snapshot) {
@@ -393,12 +392,22 @@ class UserApprovalPage extends StatelessWidget {
             return const LoadingScreen();
           }
           if (snapshot.hasError || snapshot.data == null) {
-            return Center(child: Text("Error: ${snapshot.error}"));
+            return Center(
+              child: Text(
+                "Error: ${snapshot.error}",
+                style: const TextStyle(color: Colors.red),
+              ),
+            );
           }
           final users = snapshot.data!;
 
           if (users.isEmpty) {
-            return const Center(child: Text("No accounts require approval."));
+            return const Center(
+              child: Text(
+                "No accounts require approval.",
+                style: TextStyle(color: Colors.white70),
+              ),
+            );
           }
 
           return ListView(
@@ -414,66 +423,13 @@ class UserApprovalPage extends StatelessWidget {
 }
 
 //======================================================
-// 6️⃣ ALERTS PAGE (CARDS - MOCK)
-//======================================================
-
-class AlertsPage extends StatelessWidget {
-  const AlertsPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: appGreen,
-        title: const Text("Alerts Overview"),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          const Text(
-            "Live System Incidents:",
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Colors.white70,
-            ),
-          ),
-          const SizedBox(height: 10),
-          OverviewTile(
-            icon: Icons.dangerous_rounded,
-            title: "High Alerts",
-            value: "12",
-            color: Colors.red,
-            onTap: () {}, // Placeholder for navigation
-          ),
-          OverviewTile(
-            icon: Icons.warning_rounded,
-            title: "Medium Alerts",
-            value: "35",
-            color: Colors.orange,
-            onTap: () {},
-          ),
-          OverviewTile(
-            icon: Icons.info_outline_rounded,
-            title: "Low Alerts",
-            value: "61",
-            color: Colors.blue,
-            onTap: () {},
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-//======================================================
 // 🔁 REUSABLE TILE WIDGETS
 //======================================================
 
 class OfficerTile extends StatelessWidget {
   final String name;
-  final String siteId; // Used for Department/Designation display
-  final String officerId; // Used for Employee ID display
+  final String siteId; // Department / Designation
+  final String officerId; // Employee ID
   final bool showRemoveButton;
   final String userId; // Firestore UID
 
@@ -503,7 +459,6 @@ class OfficerTile extends StatelessWidget {
             child: Icon(Icons.person, color: Colors.white),
           ),
           const SizedBox(width: 15),
-
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -513,6 +468,7 @@ class OfficerTile extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.bold,
+                    color: Colors.white,
                   ),
                 ),
                 Text(
@@ -530,11 +486,9 @@ class OfficerTile extends StatelessWidget {
               ],
             ),
           ),
-
           if (showRemoveButton)
             ElevatedButton(
               onPressed: () {
-                // Admin removal logic: Use the Firebase UID for deletion
                 FirebaseService().removeUser(userId);
               },
               style: ElevatedButton.styleFrom(backgroundColor: appGreen),
@@ -551,10 +505,10 @@ class OfficerTile extends StatelessWidget {
 
 class AnalystTile extends StatelessWidget {
   final String name;
-  final String analystId; // Used for Employee ID display
-  final String region; // Used for Region/Designation display
+  final String analystId; // Employee ID
+  final String region; // Region / Designation
   final bool showRemoveButton;
-  final String userId; // Added required parameter
+  final String userId;
 
   const AnalystTile({
     super.key,
@@ -562,7 +516,7 @@ class AnalystTile extends StatelessWidget {
     required this.analystId,
     required this.region,
     this.showRemoveButton = false,
-    required this.userId, // Added required parameter
+    required this.userId,
   });
 
   @override
@@ -582,7 +536,6 @@ class AnalystTile extends StatelessWidget {
             child: Icon(Icons.person, color: Colors.white),
           ),
           const SizedBox(width: 15),
-
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -592,6 +545,7 @@ class AnalystTile extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.bold,
+                    color: Colors.white,
                   ),
                 ),
                 Text(
@@ -609,11 +563,9 @@ class AnalystTile extends StatelessWidget {
               ],
             ),
           ),
-
           if (showRemoveButton)
             ElevatedButton(
               onPressed: () {
-                // Admin removal logic: Use the Firebase UID for deletion
                 FirebaseService().removeUser(userId);
               },
               style: ElevatedButton.styleFrom(backgroundColor: appGreen),
@@ -641,7 +593,7 @@ class OverviewTile extends StatelessWidget {
     required this.title,
     required this.value,
     required this.color,
-    required this.onTap, // Added required onTap
+    required this.onTap,
   });
 
   @override
@@ -663,7 +615,6 @@ class OverviewTile extends StatelessWidget {
               child: Icon(icon, color: color, size: 28),
             ),
             const SizedBox(width: 16),
-
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -684,7 +635,6 @@ class OverviewTile extends StatelessWidget {
                 ],
               ),
             ),
-            // Optionally add an arrow or button here for navigation
             Icon(Icons.arrow_forward_ios, size: 16, color: color),
           ],
         ),
@@ -694,7 +644,7 @@ class OverviewTile extends StatelessWidget {
 }
 
 // ------------------------------------------------------
-// NEW TILE: USER APPROVAL TILE
+// USER APPROVAL TILE
 // ------------------------------------------------------
 
 class ApprovalTile extends StatelessWidget {
@@ -704,10 +654,8 @@ class ApprovalTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Determine the role string
     final roleString = user.role.toString().split('.').last;
 
-    // Determine the role color
     Color roleColor;
     switch (user.role) {
       case UserRole.supervisor:
@@ -750,6 +698,7 @@ class ApprovalTile extends StatelessWidget {
                       style: const TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.bold,
+                        color: Colors.white,
                       ),
                     ),
                     Text(
@@ -770,15 +719,12 @@ class ApprovalTile extends StatelessWidget {
             'Emp ID: ${user.employeeId}',
             style: const TextStyle(color: Colors.white70, fontSize: 13),
           ),
-
           const SizedBox(height: 10),
-
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               TextButton(
                 onPressed: () {
-                  // Reject/Delete logic
                   FirebaseService().removeUser(user.id);
                 },
                 child: const Text(
@@ -789,7 +735,6 @@ class ApprovalTile extends StatelessWidget {
               const SizedBox(width: 10),
               ElevatedButton(
                 onPressed: () {
-                  // Approve logic: Set isAccountVerified to true
                   FirebaseService().updateUserRole(user.id, user.role, true);
                 },
                 style: ElevatedButton.styleFrom(backgroundColor: appGreen),

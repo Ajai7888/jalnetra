@@ -145,16 +145,6 @@ class ProfileScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(height: 20),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(localization.editFeaturePending)),
-                    );
-                  },
-                  icon: const Icon(Icons.edit),
-                  label: Text(localization.editProfile),
-                ),
               ],
             ),
           ),

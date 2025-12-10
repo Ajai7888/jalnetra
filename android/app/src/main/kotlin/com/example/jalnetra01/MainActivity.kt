@@ -1,5 +1,6 @@
-package com.example.jalnetra01
+package com.example.jalnetra01   // ← your package
 
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 
-class MainActivity : FlutterActivity()
+class MainActivity : FlutterFragmentActivity() {
+}

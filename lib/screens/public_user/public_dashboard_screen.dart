@@ -13,11 +13,12 @@ import 'package:jalnetra01/screens/common/profile_screen.dart';
 // 🔑 Use the new Public Capture Flow screen
 import 'package:jalnetra01/screens/public_user/public_capture_flow_screen.dart';
 
+// 🔥 NEW: Import the chatbot screen
+import 'package:jalnetra01/screens/public_user/kubo_chat_screen.dart';
+
 import '../../l10n/app_localizations.dart';
 import '../common/WeatherScreen.dart';
 import '../../../main.dart';
-
-// Assuming WeatherData is defined in WeatherScreen.dart or similar common file
 
 class PublicDashboardScreen extends StatefulWidget {
   final AppUser user; // Expecting the user object to get the email
@@ -101,8 +102,6 @@ class _PublicDashboardScreenState extends State<PublicDashboardScreen> {
     }
   }
 
-  // NOTE: This function's return type assumes the correct definition of WeatherData
-  // is available to the compiler context, as per your instructions.
   Future<dynamic> _fetchWeatherDataByCoordinates(double lat, double lon) async {
     final url = Uri.parse(
       'https://api.openweathermap.org/data/2.5/weather?lat=$lat&lon=$lon&units=metric&appid=$_apiKey',
@@ -130,9 +129,6 @@ class _PublicDashboardScreenState extends State<PublicDashboardScreen> {
             ? 70
             : 0;
 
-        // Dynamic construction, relying on the class WeatherData being in scope.
-        // To be safe against the previous error, I've changed the return type
-        // to dynamic but kept the logic, assuming WeatherScreen uses the correct type.
         return WeatherData(
           weatherIcon: icon(data['weather'][0]['id']),
           temperature: data['main']['temp'],
@@ -171,7 +167,6 @@ class _PublicDashboardScreenState extends State<PublicDashboardScreen> {
         context,
         MaterialPageRoute(
           builder: (_) =>
-              // NOTE: This assignment assumes 'weather' is the type expected by WeatherScreen
               WeatherScreen(weather: weather, location: weather.location),
         ),
       );
@@ -184,7 +179,6 @@ class _PublicDashboardScreenState extends State<PublicDashboardScreen> {
     ).showSnackBar(SnackBar(content: Text(message), backgroundColor: color));
   }
 
-  // 🚨 SOS Logic (No change)
   void _showSosDialog(BuildContext context, AppLocalizations t) {
     showDialog(
       context: context,
@@ -209,7 +203,6 @@ class _PublicDashboardScreenState extends State<PublicDashboardScreen> {
                   '${t.yourEmail}: ${widget.user.email}',
                   style: const TextStyle(fontSize: 12, color: Colors.grey),
                 ),
-                // Location warning/status
                 const SizedBox(height: 10),
                 Text(
                   _currentPosition != null
@@ -253,8 +246,6 @@ class _PublicDashboardScreenState extends State<PublicDashboardScreen> {
         : t.sosDefaultMessage;
 
     try {
-      // The FirebaseService().sendSosNotification method was updated in the previous step
-      // to handle logging this alert for Supervisors/Field Officers.
       await _firebaseService.sendSosNotification(
         userEmail: widget.user.email,
         message: message,
@@ -273,13 +264,11 @@ class _PublicDashboardScreenState extends State<PublicDashboardScreen> {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context)!;
 
-    // Language dropdown config
     final currentLocale = Localizations.localeOf(context);
     final selectedLang = currentLocale.languageCode;
     final languageMap = {"en": "English", "hi": "हिन्दी", "ta": "தமிழ்"};
 
     return Scaffold(
-      // Drawer: Side Menu (Left)
       drawer: Drawer(
         child: Container(
           color: const Color(0xFF101010),
@@ -290,7 +279,7 @@ class _PublicDashboardScreenState extends State<PublicDashboardScreen> {
                 const Padding(
                   padding: EdgeInsets.all(20.0),
                   child: Text(
-                    'People Menu', // 🔑 Updated Title
+                    'People Menu',
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
@@ -299,8 +288,6 @@ class _PublicDashboardScreenState extends State<PublicDashboardScreen> {
                   ),
                 ),
                 const Divider(color: Colors.white24),
-
-                // 🚨 SOS Button Relocated to Drawer
                 Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 16.0,
@@ -313,7 +300,7 @@ class _PublicDashboardScreenState extends State<PublicDashboardScreen> {
                           _isLocationAvailable ||
                               FirebaseAuth.instance.currentUser != null
                           ? () {
-                              Navigator.pop(context); // Close drawer
+                              Navigator.pop(context);
                               _showSosDialog(context, t);
                             }
                           : null,
@@ -341,12 +328,8 @@ class _PublicDashboardScreenState extends State<PublicDashboardScreen> {
                   ),
                 ),
                 const Divider(color: Colors.white24),
-
                 ListTile(
-                  leading: const Icon(
-                    Icons.place,
-                    color: Colors.amberAccent,
-                  ), // 🔑 New color theme
+                  leading: const Icon(Icons.place, color: Colors.amberAccent),
                   title: Text(
                     _currentLocationName,
                     style: const TextStyle(color: Colors.white),
@@ -360,7 +343,7 @@ class _PublicDashboardScreenState extends State<PublicDashboardScreen> {
                 ListTile(
                   leading: const Icon(
                     Icons.cloud_queue,
-                    color: Colors.amberAccent, // 🔑 New color theme
+                    color: Colors.amberAccent,
                   ),
                   title: Text(
                     t.checkWeather,
@@ -374,7 +357,7 @@ class _PublicDashboardScreenState extends State<PublicDashboardScreen> {
                 ListTile(
                   leading: const Icon(
                     Icons.person_outline,
-                    color: Colors.amberAccent, // 🔑 New color theme
+                    color: Colors.amberAccent,
                   ),
                   title: Text(
                     t.viewProfile,
@@ -421,7 +404,6 @@ class _PublicDashboardScreenState extends State<PublicDashboardScreen> {
           ),
         ),
       ),
-
       appBar: AppBar(
         leading: Builder(
           builder: (context) => IconButton(
@@ -429,9 +411,8 @@ class _PublicDashboardScreenState extends State<PublicDashboardScreen> {
             onPressed: () => Scaffold.of(context).openDrawer(),
           ),
         ),
-        title: Text(t.publicUserDashboard), // 🔑 Updated Title
+        title: Text(t.publicUserDashboard),
         actions: [
-          // ❌ SOS Button Removed from AppBar actions
           DropdownButtonHideUnderline(
             child: DropdownButton<String>(
               value: selectedLang,
@@ -453,10 +434,9 @@ class _PublicDashboardScreenState extends State<PublicDashboardScreen> {
           const SizedBox(width: 4),
         ],
       ),
-
       body: Stack(
         children: [
-          // Placeholder Map UI
+          // Map placeholder background
           Center(
             child: Container(
               color: Colors.blueGrey.shade900,
@@ -531,7 +511,7 @@ class _PublicDashboardScreenState extends State<PublicDashboardScreen> {
             ),
           ),
 
-          // Capture flow FAB
+          // Capture flow FAB (center bottom)
           Positioned(
             bottom: 30,
             left: MediaQuery.of(context).size.width / 2 - 35,
@@ -546,7 +526,6 @@ class _PublicDashboardScreenState extends State<PublicDashboardScreen> {
                     ? () => Navigator.push(
                         context,
                         MaterialPageRoute(
-                          // 🔑 Navigate to the Public Capture Flow
                           builder: (_) => const PublicCaptureFlowScreen(),
                         ),
                       )
@@ -556,6 +535,27 @@ class _PublicDashboardScreenState extends State<PublicDashboardScreen> {
                   size: 35,
                   color: Colors.white,
                 ),
+              ),
+            ),
+          ),
+
+          // 🔥 NEW: Chatbot FAB (bottom-right)
+          Positioned(
+            bottom: 30,
+            right: 20,
+            child: FloatingActionButton(
+              heroTag: 'kubo_chat_fab',
+              backgroundColor: Colors.deepPurple,
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const KuboChatScreen()),
+                );
+              },
+              child: const Icon(
+                Icons.chat_bubble_outline,
+                size: 28,
+                color: Colors.white,
               ),
             ),
           ),

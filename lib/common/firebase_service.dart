@@ -1,19 +1,22 @@
 // lib/common/firebase_service.dart
 
 import 'dart:io';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
+
 import 'package:jalnetra01/models/reading_model.dart';
 import 'package:jalnetra01/models/user_models.dart';
+
 import '../firebase_options.dart';
 
 class FirebaseService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // Uses the instance variable for _storage (fixed for consistency)
+  /// Storage instance for the configured bucket
   late final FirebaseStorage _storage = FirebaseStorage.instanceFor(
     bucket: DefaultFirebaseOptions.currentPlatform.storageBucket,
   );
@@ -52,7 +55,7 @@ class FirebaseService {
         designation: designation,
       );
 
-      // Add an 'isVerified' flag for users to manage pending accounts (for Admin)
+      // Account verification flag for admin approval
       final userMap = appUser.toMap()..['isAccountVerified'] = false;
 
       await _firestore.collection('users').doc(user.uid).set(userMap);
@@ -195,15 +198,16 @@ class FirebaseService {
     );
   }
 
-  /// Shared logic for uploading file + creating Firestore doc
+  /// Shared logic for uploading file + creating Firestore doc.
+  /// This is where the **correct Firebase Storage download URL** is created.
   Future<void> _submitReadingToCollection({
     required String collectionName,
     required WaterReading reading,
     required File photoFile,
   }) async {
     try {
-      // 0. Make sure user is logged in
-      final user = FirebaseAuth.instance.currentUser;
+      // Ensure user is logged in
+      final user = _auth.currentUser;
       if (user == null) {
         throw FirebaseException(
           plugin: 'firebase_storage',
@@ -212,7 +216,7 @@ class FirebaseService {
         );
       }
 
-      // 1. Sanitize file path components
+      // Sanitize path components
       final safeSiteId = reading.siteId
           .replaceAll(RegExp(r'[#\[\]\.\/\\]'), '')
           .trim();
@@ -230,7 +234,7 @@ class FirebaseService {
 
       final ref = _storage.ref(filePath);
 
-      // 2. Upload file with minimal metadata
+      // Upload JPEG with content type
       final uploadTask = ref.putFile(
         photoFile,
         SettableMetadata(contentType: 'image/jpeg'),
@@ -240,23 +244,22 @@ class FirebaseService {
       final downloadUrl = await snapshot.ref.getDownloadURL();
       debugPrint('✅ Uploaded. URL: $downloadUrl');
 
-      // 3. Save Firestore doc in the given collection
-      //    Use a single CREATE (set) so it matches rules (no extra update).
+      // Create Firestore doc
       final docRef = _firestore.collection(collectionName).doc();
 
-      final finalReadingMap = WaterReading(
+      final finalReading = WaterReading(
         id: docRef.id,
         siteId: reading.siteId,
-        officerId: reading.officerId,
+        officerId: user.uid, // enforced from auth
         waterLevel: reading.waterLevel,
-        imageUrl: downloadUrl,
+        imageUrl: downloadUrl, // THIS is the valid URL used in dashboard
         location: reading.location,
         timestamp: reading.timestamp,
-        isVerified: false, // new readings always unverified
+        isVerified: false,
         isManual: reading.isManual,
-      ).toMap();
+      );
 
-      await docRef.set(finalReadingMap);
+      await docRef.set(finalReading.toMap());
     } on FirebaseException catch (e, st) {
       debugPrint('🔥 Firebase Storage/Firestore error');
       debugPrint('  code   : ${e.code}');
@@ -278,6 +281,7 @@ class FirebaseService {
     return _firestore
         .collection('readings')
         .where('isVerified', isEqualTo: false)
+        .orderBy('timestamp', descending: true)
         .snapshots()
         .map(
           (snap) =>
@@ -294,10 +298,12 @@ class FirebaseService {
     });
   }
 
+  /// All verified readings (for history + trends)
   Stream<List<WaterReading>> getAllVerifiedReadings() {
     return _firestore
         .collection('readings')
         .where('isVerified', isEqualTo: true)
+        .orderBy('timestamp', descending: true)
         .snapshots()
         .map(
           (snap) =>

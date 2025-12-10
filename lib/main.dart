@@ -1,7 +1,7 @@
 // lib/main.dart
 
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart'; // for kIsWeb
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 
@@ -13,16 +13,22 @@ import 'package:jalnetra01/screens/auth/role_selection_screen.dart';
 import 'l10n/app_localizations.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // ✅ Initialize Firebase for all platforms (mobile + web)
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  await FirebaseAppCheck.instance.activate(
-    androidProvider: kDebugMode
-        ? AndroidProvider.debug
-        : AndroidProvider.playIntegrity,
-  );
+  // ✅ App Check: enable only on mobile for now (to avoid web crash)
+  if (!kIsWeb) {
+    await FirebaseAppCheck.instance.activate(
+      androidProvider: kDebugMode
+          ? AndroidProvider.debug
+          : AndroidProvider.playIntegrity,
+      // You can add iOS later like:
+      // appleProvider: AppleProvider.appAttest,
+    );
+  }
 
   runApp(const JalNetraApp());
 }
@@ -57,7 +63,7 @@ class _JalNetraAppState extends State<JalNetraApp> {
       theme: AppTheme.darkTheme,
       debugShowCheckedModeBanner: false,
 
-      // 🌍 Here we activate localization
+      // 🌍 Localization setup
       locale: _locale,
       supportedLocales: const [
         Locale('en'), // English

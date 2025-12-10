@@ -3,10 +3,15 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
+import 'package:flutter_tts/flutter_tts.dart';
+
+// 👇 your existing localization import (same as in capture_flow_screen.dart)
+import '../../l10n/app_localizations.dart';
 
 const double MAX_DISTANCE_METERS = 10.0; // distance threshold for "too far"
 const String _dlApiUrl =
@@ -30,31 +35,90 @@ class _LiveCameraValidationScreenState
   // Validation state
   bool _isGaugeDetected = false;
   bool _isWithinRange = false;
-  String _bottomValidationMessage = "Initializing camera...";
-  String _centerOverlayMessage = "Initializing...";
+  String _bottomValidationMessage = "";
+  String _centerOverlayMessage = "";
 
   // Timer for periodic check
   Timer? _apiCheckTimer;
   bool _isCheckingFrame = false;
 
+  // 🔊 Text-to-Speech
+  final FlutterTts _flutterTts = FlutterTts();
+  String? _lastSpokenMessage;
+  bool _ttsReady = false;
+
   @override
   void initState() {
     super.initState();
-    _initializeCamera();
+
+    // Use a post-frame callback so that Localizations & context are ready
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initTts();
+      _initializeCamera();
+    });
   }
 
   @override
   void dispose() {
     _apiCheckTimer?.cancel();
     _controller?.dispose();
+    _flutterTts.stop();
     super.dispose();
   }
 
+  // 🔊 Decide TTS language based on current app language
+  String _getTtsLanguageCode() {
+    final langCode = Localizations.localeOf(context).languageCode;
+    switch (langCode) {
+      case 'ta':
+        return 'ta-IN';
+      case 'hi':
+        return 'hi-IN';
+      default:
+        return 'en-IN';
+    }
+  }
+
+  // 🔊 Initialize TTS
+  Future<void> _initTts() async {
+    try {
+      await _flutterTts.setLanguage(_getTtsLanguageCode());
+      await _flutterTts.setSpeechRate(0.5); // slower, clearer
+      await _flutterTts.setPitch(1.0);
+      await _flutterTts.setVolume(1.0);
+
+      _ttsReady = true;
+
+      final t = AppLocalizations.of(context)!;
+      _speakOnce(t.liveInitVoice); // e.g. "Initializing camera. Please wait."
+    } catch (e) {
+      debugPrint("TTS init error: $e");
+      _ttsReady = false;
+    }
+  }
+
+  // 🔊 Speak only when message changes (avoid spam every 2 sec)
+  Future<void> _speakOnce(String message) async {
+    if (!_ttsReady) return;
+    if (_lastSpokenMessage == message) return;
+
+    _lastSpokenMessage = message;
+    try {
+      await _flutterTts.stop();
+      await _flutterTts.speak(message);
+    } catch (e) {
+      debugPrint("TTS speak error: $e");
+    }
+  }
+
   Future<void> _initializeCamera() async {
+    final t = AppLocalizations.of(context)!;
+
     if (widget.cameras.isEmpty) {
       if (mounted) {
-        setState(() => _bottomValidationMessage = "No camera found.");
+        setState(() => _bottomValidationMessage = t.liveNoCamera);
       }
+      _speakOnce(t.liveNoCamera);
       return;
     }
 
@@ -70,21 +134,26 @@ class _LiveCameraValidationScreenState
     try {
       await _controller!.initialize();
       _isCameraReady = true;
+
       if (mounted) {
         setState(() {
-          _bottomValidationMessage = "Aim at the gauge...";
-          _centerOverlayMessage = "Checking...";
+          _bottomValidationMessage = t.liveAimAtGauge; // "Aim at the gauge..."
+          _centerOverlayMessage = t.liveChecking; // "Checking..."
         });
       }
+
+      // 🔊 Tell user what to do (in selected language)
+      _speakOnce(t.liveCameraReadyVoice);
 
       _startApiCheckTimer();
     } catch (e) {
       if (mounted) {
         setState(() {
-          _bottomValidationMessage = "Error initializing camera: $e";
+          _bottomValidationMessage = t.liveCameraError;
           _isCameraReady = false;
         });
       }
+      _speakOnce(t.liveCameraError);
     }
   }
 
@@ -116,9 +185,10 @@ class _LiveCameraValidationScreenState
   /// Call DL API on current frame and update UI state.
   Future<void> _checkGaugeUsingDL(File imageFile) async {
     if (!mounted) return;
+    final t = AppLocalizations.of(context)!;
 
     setState(() {
-      _centerOverlayMessage = "Checking frame...";
+      _centerOverlayMessage = t.liveChecking; // "Checking..."
     });
 
     try {
@@ -143,10 +213,11 @@ class _LiveCameraValidationScreenState
         setState(() {
           _isGaugeDetected = false;
           _isWithinRange = false;
-          _centerOverlayMessage = "Gauge Not Found";
-          _bottomValidationMessage =
-              "Unable to validate frame. Please try again.";
+          _centerOverlayMessage = t.liveGaugeNotFound;
+          _bottomValidationMessage = t.liveFrameError;
         });
+
+        _speakOnce(t.liveFrameError);
         return;
       }
 
@@ -163,10 +234,8 @@ class _LiveCameraValidationScreenState
       bool gaugeDetected = false;
 
       if (error != null && error.isNotEmpty) {
-        // Backend explicitly said something is wrong: treat as NOT gauge
         gaugeDetected = false;
       } else if (message != null && message.isNotEmpty) {
-        // If we can parse a water level number from message → gauge exists
         final match = RegExp(r'([0-9]+(?:\.[0-9]+)?)').firstMatch(message);
         gaugeDetected = match != null;
       }
@@ -176,10 +245,13 @@ class _LiveCameraValidationScreenState
         setState(() {
           _isGaugeDetected = false;
           _isWithinRange = false;
-          _centerOverlayMessage = "Gauge Not Found";
+          _centerOverlayMessage = t.liveGaugeNotFound; // "Gauge Not Found"
           _bottomValidationMessage =
-              "Gauge not detected. Aim at the gauge and hold steady.";
+              t.liveGaugeNotDetectedAim; // "Gauge not detected. Aim…"
         });
+
+        // 🔊 Audio: gauge not detected
+        _speakOnce(t.liveGaugeNotDetectedAim);
         return;
       }
 
@@ -187,13 +259,11 @@ class _LiveCameraValidationScreenState
       double distance = MAX_DISTANCE_METERS;
 
       if (jsonResponse is Map<String, dynamic>) {
-        // If backend adds something like "distance_m": 7.9 then use it
         if (jsonResponse['distance_m'] != null) {
           final maybe = double.tryParse(jsonResponse['distance_m'].toString());
           if (maybe != null) distance = maybe;
         } else {
-          // Fallback: a reasonable mid value so UI still shows distance.
-          distance = 7.5;
+          distance = 7.5; // fallback – mid value
         }
       }
 
@@ -204,23 +274,26 @@ class _LiveCameraValidationScreenState
         setState(() {
           _isGaugeDetected = true;
           _isWithinRange = true;
-          _centerOverlayMessage = "Gauge Found - Capture Enabled";
-          _bottomValidationMessage =
-              "Gauge FOUND! Distance: ${distance.toStringAsFixed(1)}m. Ready to Capture!";
+          _centerOverlayMessage = t.liveReadyOverlay;
+          _bottomValidationMessage = t.liveReadyBottom;
         });
 
-        // We can stop continuous checks once it's good;
-        // user can hit capture immediately.
+        // 🔊 Audio: ready to capture
+        _speakOnce(t.liveReadyBottom);
+
+        // Stop continuous checks, user can capture
         _apiCheckTimer?.cancel();
       } else {
         // Gauge present but too far
         setState(() {
           _isGaugeDetected = true;
           _isWithinRange = false;
-          _centerOverlayMessage = "Move Closer: Too Far!";
-          _bottomValidationMessage =
-              "Too far! Distance: ${distance.toStringAsFixed(1)}m. Max: ${MAX_DISTANCE_METERS.toStringAsFixed(1)}m.";
+          _centerOverlayMessage = t.liveTooFarOverlay;
+          _bottomValidationMessage = t.liveTooFarBottom;
         });
+
+        // 🔊 Audio: move closer
+        _speakOnce(t.liveTooFarBottom);
       }
     } catch (e) {
       debugPrint('Live validation DL error: $e');
@@ -228,9 +301,12 @@ class _LiveCameraValidationScreenState
       setState(() {
         _isGaugeDetected = false;
         _isWithinRange = false;
-        _centerOverlayMessage = "Gauge Not Found";
-        _bottomValidationMessage = "Network error during validation.";
+        _centerOverlayMessage = t.liveGaugeNotFound;
+        _bottomValidationMessage = t.liveNetworkError;
       });
+
+      // 🔊 Audio: network error
+      _speakOnce(t.liveNetworkError);
     }
   }
 
@@ -242,9 +318,12 @@ class _LiveCameraValidationScreenState
       return;
     }
 
+    final t = AppLocalizations.of(context)!;
+
     try {
       _apiCheckTimer?.cancel();
       final XFile file = await _controller!.takePicture();
+      _speakOnce(t.liveCaptureSuccess);
       if (mounted) {
         Navigator.pop(context, file);
       }
@@ -254,6 +333,7 @@ class _LiveCameraValidationScreenState
           context,
         ).showSnackBar(SnackBar(content: Text("Capture Error: $e")));
       }
+      _speakOnce(t.liveCaptureError);
     }
   }
 
@@ -304,16 +384,23 @@ class _LiveCameraValidationScreenState
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context)!;
+
     if (!_isCameraReady) {
+      // Also localized title
       return Scaffold(
-        appBar: AppBar(title: const Text("Live Validation")),
+        appBar: AppBar(title: Text(t.liveTitle)),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const CircularProgressIndicator(),
               const SizedBox(height: 16),
-              Text(_bottomValidationMessage),
+              Text(
+                _bottomValidationMessage.isEmpty
+                    ? t.liveInitMessage
+                    : _bottomValidationMessage,
+              ),
             ],
           ),
         ),

@@ -1,41 +1,7 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:fl_chart/fl_chart.dart'; // Chart library
-import 'package:jalnetra01/common/firebase_service.dart';
-import 'package:jalnetra01/models/reading_model.dart';
-import 'package:jalnetra01/screens/auth/role_selection_screen.dart';
-import 'package:jalnetra01/screens/common/profile_screen.dart';
-import 'package:jalnetra01/screens/analyst/analyst_detail_screen.dart';
-import 'package:jalnetra01/screens/common/water_level_trend_charts.dart';
-
-// --- Constants ---
-const List<String> kWaterSites = [
-  'PUZHAL',
-  'VEERANAM',
-  'CHEMBARAMBAKAM',
-  'CHOLAVARAM',
-  'POONDI',
-];
-
-// --- Data Processor Class ---
-class DashboardData {
-  // ... (omitted for brevity, assume definition is here)
-  final int totalReceived;
-  final int safeZone;
-  final int dangerZones;
-  final int warningsToday;
-  final List<WaterReading> readings;
-
-  DashboardData({
-    required this.totalReceived,
-    required this.safeZone,
-    required this.dangerZones,
-    required this.warningsToday,
-    required this.readings,
-  });
-}
-
-// --- Page Index Definition ---
-enum AnalystPage { dashboard, trends, profile }
+import 'package:fl_chart/fl_chart.dart';
+import 'package:intl/intl.dart';
 
 class AnalystDashboardScreen extends StatefulWidget {
   const AnalystDashboardScreen({super.key});
@@ -45,483 +11,1146 @@ class AnalystDashboardScreen extends StatefulWidget {
 }
 
 class _AnalystDashboardScreenState extends State<AnalystDashboardScreen> {
-  static const double dangerThreshold = 4.0;
-  static const double warningThreshold = 2.5;
-
-  AnalystPage _currentPage = AnalystPage.dashboard;
-  List<WaterReading> _allReadings = [];
-  String _currentSiteFilter = kWaterSites.first; // NEW State for Dropdown
-
-  // -------------------------------------------------------------------
-  // DATA PROCESSING & UI LOGIC
-  // -------------------------------------------------------------------
-
-  DashboardData _processReadings(List<WaterReading> allReadings) {
-    int total = allReadings.length;
-    int danger = 0;
-    int warning = 0;
-    int safe = 0;
-
-    for (var reading in allReadings) {
-      if (reading.waterLevel >= dangerThreshold) {
-        danger++;
-      } else if (reading.waterLevel >= warningThreshold) {
-        warning++;
-      } else {
-        safe++;
-      }
-    }
-
-    return DashboardData(
-      totalReceived: total,
-      safeZone: safe,
-      dangerZones: danger,
-      warningsToday: warning,
-      readings: allReadings,
-    );
-  }
-
-  // -------------------------------------------------------------------
-  // NAVIGATION HANDLER
-  // -------------------------------------------------------------------
-
-  // ... (omitted _navigateToDetail, assume definition is here)
-  void _navigateToDetail(
-    BuildContext context,
-    DashboardData data, // Receives data object
-    String viewKey,
-    String title,
-    Color color,
-  ) {
-    List<WaterReading> filteredList;
-
-    if (viewKey == 'dataReceived') {
-      filteredList = data.readings;
-    } else if (viewKey == 'dangerZones') {
-      filteredList = data.readings
-          .where((r) => r.waterLevel >= dangerThreshold)
-          .toList();
-    } else if (viewKey == 'warningsToday') {
-      filteredList = data.readings
-          .where(
-            (r) =>
-                r.waterLevel >= warningThreshold &&
-                r.waterLevel < dangerThreshold,
-          )
-          .toList();
-    } else {
-      // safeZone
-      filteredList = data.readings
-          .where((r) => r.waterLevel < warningThreshold)
-          .toList();
-    }
-
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => AnalystDetailScreen(
-          title: title,
-          readings: filteredList,
-          statusColor: color,
-        ),
-      ),
-    );
-  }
-
-  // -------------------------------------------------------------------
-  // DATA EXPORT LOGIC
-  // -------------------------------------------------------------------
-
-  // ... (omitted _exportData, assume definition is here)
-  void _exportData(BuildContext context, DashboardData data, String viewKey) {
-    List<WaterReading> filteredList;
-    String filename =
-        'unknown_data'; // Initialized to prevent non-nullable error
-
-    // Determine which dataset to export
-    if (viewKey == 'dataReceived') {
-      filteredList = data.readings;
-      filename = 'all_readings';
-    } else if (viewKey == 'dangerZones') {
-      filteredList = data.readings
-          .where((r) => r.waterLevel >= dangerThreshold)
-          .toList();
-      filename = 'danger_zone_readings';
-    } else if (viewKey == 'warningsToday') {
-      filteredList = data.readings
-          .where(
-            (r) =>
-                r.waterLevel >= warningThreshold &&
-                r.waterLevel < dangerThreshold,
-          )
-          .toList();
-      filename = 'warning_readings';
-    } else if (viewKey == 'safeZone') {
-      filteredList = data.readings
-          .where((r) => r.waterLevel < warningThreshold)
-          .toList();
-      filename = 'safe_zone_readings';
-    } else {
-      return;
-    }
-
-    if (filteredList.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No data available to export for this category.'),
-        ),
-      );
-      return;
-    }
-
-    // --- MOCK EXPORT PROCESS ---
-    int rowCount = filteredList.length;
-
-    // Simulate delay for file processing
-    Future.delayed(const Duration(milliseconds: 800), () {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Successfully generated $filename.csv with $rowCount records.',
-          ),
-          backgroundColor: Colors.blueGrey,
-        ),
-      );
-    });
-  }
-
-  // -------------------------------------------------------------------
-  // PAGE CONTENT BUILDERS
-  // -------------------------------------------------------------------
-
-  String _getTitle() {
-    switch (_currentPage) {
-      case AnalystPage.dashboard:
-        return 'JALNETRA - Analytics Dashboard';
-      case AnalystPage.trends:
-        return 'Water Level Trends';
-      case AnalystPage.profile:
-        return 'User Profile';
-    }
-  }
-
-  Widget _getBodyWidget(DashboardData data) {
-    switch (_currentPage) {
-      case AnalystPage.dashboard:
-        return _buildDashboardContent(data);
-      case AnalystPage.trends:
-        return _buildTrendsContent();
-      case AnalystPage.profile:
-        return const Center(
-          child: Text("Use the Profile button in the drawer."),
-        );
-    }
-  }
-
-  Widget _buildTrendsContent() {
-    if (_allReadings.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.only(top: 50.0),
-          child: Text(
-            'No verified readings available for trend analysis.',
-            style: TextStyle(fontSize: 18, color: Colors.grey),
-          ),
-        ),
-      );
-    }
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // NEW: Site Selection Dropdown
-          _buildSiteDropdown(),
-          const SizedBox(height: 16),
-
-          WaterLevelTrendCharts(
-            allReadings: _allReadings,
-            title:
-                "Analyst Trend Analysis (${_allReadings.length} Total Readings)",
-            selectedSite: _currentSiteFilter, // Pass the filter
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSiteDropdown() {
-    return DropdownButton<String>(
-      value: _currentSiteFilter,
-      dropdownColor: Colors.grey.shade900,
-      onChanged: (String? newValue) {
-        if (newValue != null) {
-          setState(() {
-            _currentSiteFilter = newValue;
-          });
-        }
-      },
-      items: kWaterSites.map((String site) {
-        return DropdownMenuItem<String>(
-          value: site,
-          child: Text(
-            site,
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildDashboardContent(DashboardData data) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(12.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 1. TOP STATS GRID
-          _buildStatsGrid(context, data),
-
-          const SizedBox(height: 20),
-
-          // 2. QUICK INSIGHTS / RADIAL BAR CHART
-          _buildQuickInsights(context, data),
-          const SizedBox(height: 20),
-
-          // 3. DATA RECEIVED LIST (MOCK - Now Static)
-          _buildDataReceivedList(context, data),
-        ],
-      ),
-    );
-  }
-  // -------------------------------------------------------------------
-  // MAIN BUILD METHOD
-  // -------------------------------------------------------------------
+  String _selectedSite = 'all';
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<List<WaterReading>>(
-      stream: FirebaseService().getAllVerifiedReadings(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (snapshot.hasError) {
-          return Center(child: Text('Error: ${snapshot.error}'));
-        }
+    // Local dark theme just for this screen
+    final darkTheme = ThemeData.dark().copyWith(
+      scaffoldBackgroundColor: Colors.transparent,
+      cardColor: const Color(0xff111827),
+      textTheme: ThemeData.dark().textTheme.apply(
+        bodyColor: Colors.white,
+        displayColor: Colors.white,
+      ),
+    );
 
-        _allReadings = snapshot.data ?? [];
-        final data = _processReadings(_allReadings);
-
-        return Scaffold(
-          appBar: AppBar(
-            title: Text(_getTitle()),
-            actions: [
-              // Logout is kept in the AppBar actions for consistent UI
-              IconButton(
-                icon: const Icon(Icons.logout),
-                tooltip: 'Logout',
-                onPressed: () async {
-                  await FirebaseService().signOut();
-                  if (context.mounted) {
-                    Navigator.pushAndRemoveUntil(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const RoleSelectionScreen(),
+    return Theme(
+      data: darkTheme,
+      child: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xff020617), Color(0xff111827)], // near-black
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
+          body: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: StreamBuilder<QuerySnapshot>(
+                stream: FirebaseFirestore.instance
+                    .collection('readings')
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          CircularProgressIndicator(),
+                          SizedBox(height: 12),
+                          Text('Loading Dashboard...'),
+                        ],
                       ),
-                      (route) => false,
                     );
                   }
+
+                  if (snapshot.hasError) {
+                    return Center(
+                      child: Text(
+                        'Error loading data: ${snapshot.error}',
+                        textAlign: TextAlign.center,
+                      ),
+                    );
+                  }
+
+                  final docs = snapshot.data?.docs ?? [];
+                  final readings = docs.map((d) => Reading.fromDoc(d)).toList();
+
+                  if (readings.isEmpty) {
+                    return const Center(
+                      child: Text('No readings found in Firestore.'),
+                    );
+                  }
+
+                  final sites =
+                      readings
+                          .map((r) => r.siteId)
+                          .where((s) => s.isNotEmpty)
+                          .toSet()
+                          .toList()
+                        ..sort();
+
+                  final String? selectedSiteData = _selectedSite != 'all'
+                      ? _selectedSite
+                      : (sites.isNotEmpty ? sites.first : null);
+
+                  final manualVsAuto = getManualVsAutomated(readings);
+                  final verificationStats = getVerificationStats(readings);
+                  final siteReadCounts = getSiteReadingsCount(readings);
+                  final weeklyTrend = getWeeklyTrend(readings, _selectedSite);
+                  final highestSites = getHighestWaterLevelSite(readings);
+                  final now = DateTime.now();
+
+                  final lastHourCount = getReadingsByTimeRange(
+                    readings,
+                    _selectedSite,
+                    1,
+                  );
+                  final last24Count = getReadingsByTimeRange(
+                    readings,
+                    _selectedSite,
+                    24,
+                  );
+                  final lastWeekCount = getReadingsByTimeRange(
+                    readings,
+                    _selectedSite,
+                    168,
+                  );
+
+                  final todayLevels = selectedSiteData != null
+                      ? getTodayWaterLevels(readings, selectedSiteData)
+                      : <TimePeriodLevel>[];
+
+                  final waterChange = selectedSiteData != null
+                      ? getWaterLevelChange(readings, selectedSiteData)
+                      : const WaterChange.zero();
+
+                  return Column(
+                    children: [
+                      _Header(
+                        sites: sites,
+                        selectedSite: _selectedSite,
+                        onSiteChanged: (value) {
+                          setState(() {
+                            _selectedSite = value;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      Expanded(
+                        child: SingleChildScrollView(
+                          child: Column(
+                            children: [
+                              _KeyMetricsRow(
+                                lastHourCount: lastHourCount,
+                                last24Count: last24Count,
+                                lastWeekCount: lastWeekCount,
+                                totalSites: sites.length,
+                              ),
+                              const SizedBox(height: 16),
+
+                              // Row 1
+                              LayoutBuilder(
+                                builder: (context, constraints) {
+                                  final isWide = constraints.maxWidth > 800;
+                                  return Flex(
+                                    direction: isWide
+                                        ? Axis.horizontal
+                                        : Axis.vertical,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Flexible(
+                                        flex: 1,
+                                        child: _CardContainer(
+                                          title: 'Manual vs Automated Readings',
+                                          child: Column(
+                                            children: [
+                                              SizedBox(
+                                                height: 240,
+                                                child: PieChart(
+                                                  PieChartData(
+                                                    sectionsSpace: 4,
+                                                    centerSpaceRadius: 40,
+                                                    sections: manualVsAuto
+                                                        .map(
+                                                          (
+                                                            d,
+                                                          ) => PieChartSectionData(
+                                                            color: d.color,
+                                                            value: d.value
+                                                                .toDouble(),
+                                                            title:
+                                                                '${d.name}\n${d.value.toInt()}',
+                                                            radius: 70,
+                                                            titleStyle:
+                                                                const TextStyle(
+                                                                  fontSize: 12,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .bold,
+                                                                  color: Colors
+                                                                      .white,
+                                                                ),
+                                                          ),
+                                                        )
+                                                        .toList(),
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(height: 12),
+                                              Container(
+                                                width: double.infinity,
+                                                padding: const EdgeInsets.all(
+                                                  12,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(
+                                                    0xff1d4ed8,
+                                                  ).withOpacity(0.25),
+                                                  borderRadius:
+                                                      BorderRadius.circular(12),
+                                                ),
+                                                child: Text(
+                                                  _manualAutoInsight(
+                                                    manualVsAuto,
+                                                  ),
+                                                  style: const TextStyle(
+                                                    fontSize: 13,
+                                                    color: Colors.white70,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                      if (isWide)
+                                        const SizedBox(width: 16)
+                                      else
+                                        const SizedBox(height: 16),
+                                      Flexible(
+                                        flex: 1,
+                                        child: _CardContainer(
+                                          title: 'Readings per Site',
+                                          child: Column(
+                                            children: [
+                                              SizedBox(
+                                                height: 240,
+                                                child: BarChart(
+                                                  BarChartData(
+                                                    gridData: FlGridData(
+                                                      show: true,
+                                                      drawVerticalLine: false,
+                                                      horizontalInterval: 5,
+                                                      getDrawingHorizontalLine:
+                                                          (value) => FlLine(
+                                                            color:
+                                                                Colors.white12,
+                                                            strokeWidth: 1,
+                                                          ),
+                                                    ),
+                                                    borderData: FlBorderData(
+                                                      show: false,
+                                                    ),
+                                                    titlesData: FlTitlesData(
+                                                      bottomTitles: AxisTitles(
+                                                        sideTitles: SideTitles(
+                                                          showTitles: true,
+                                                          getTitlesWidget: (value, meta) {
+                                                            final index = value
+                                                                .toInt();
+                                                            if (index < 0 ||
+                                                                index >=
+                                                                    siteReadCounts
+                                                                        .length) {
+                                                              return const SizedBox.shrink();
+                                                            }
+                                                            return Padding(
+                                                              padding:
+                                                                  const EdgeInsets.only(
+                                                                    top: 4,
+                                                                  ),
+                                                              child: Text(
+                                                                siteReadCounts[index]
+                                                                    .site,
+                                                                style: const TextStyle(
+                                                                  fontSize: 10,
+                                                                  color: Colors
+                                                                      .white70,
+                                                                ),
+                                                              ),
+                                                            );
+                                                          },
+                                                        ),
+                                                      ),
+                                                      leftTitles: AxisTitles(
+                                                        sideTitles: SideTitles(
+                                                          showTitles: true,
+                                                          reservedSize: 30,
+                                                          getTitlesWidget:
+                                                              (value, meta) {
+                                                                return Text(
+                                                                  value
+                                                                      .toInt()
+                                                                      .toString(),
+                                                                  style: const TextStyle(
+                                                                    fontSize:
+                                                                        10,
+                                                                    color: Colors
+                                                                        .white60,
+                                                                  ),
+                                                                );
+                                                              },
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    barGroups: List.generate(
+                                                      siteReadCounts.length,
+                                                      (index) {
+                                                        final item =
+                                                            siteReadCounts[index];
+                                                        return BarChartGroupData(
+                                                          x: index,
+                                                          barRods: [
+                                                            BarChartRodData(
+                                                              toY: item.count
+                                                                  .toDouble(),
+                                                              width: 18,
+                                                              borderRadius:
+                                                                  BorderRadius.circular(
+                                                                    4,
+                                                                  ),
+                                                              // color handled by theme / default
+                                                            ),
+                                                          ],
+                                                        );
+                                                      },
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(height: 12),
+                                              Container(
+                                                width: double.infinity,
+                                                padding: const EdgeInsets.all(
+                                                  12,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(
+                                                    0xff15803d,
+                                                  ).withOpacity(0.25),
+                                                  borderRadius:
+                                                      BorderRadius.circular(12),
+                                                ),
+                                                child: Text(
+                                                  _siteReadingsInsight(
+                                                    siteReadCounts,
+                                                  ),
+                                                  style: const TextStyle(
+                                                    fontSize: 13,
+                                                    color: Colors.white70,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                },
+                              ),
+
+                              const SizedBox(height: 16),
+
+                              // Row 2
+                              LayoutBuilder(
+                                builder: (context, constraints) {
+                                  final isWide = constraints.maxWidth > 800;
+                                  return Flex(
+                                    direction: isWide
+                                        ? Axis.horizontal
+                                        : Axis.vertical,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Flexible(
+                                        flex: 1,
+                                        child: _CardContainer(
+                                          title:
+                                              "Today's Water Levels - ${selectedSiteData ?? 'N/A'}",
+                                          child: Column(
+                                            children: [
+                                              SizedBox(
+                                                height: 240,
+                                                child: BarChart(
+                                                  BarChartData(
+                                                    gridData: FlGridData(
+                                                      show: true,
+                                                      drawVerticalLine: false,
+                                                      horizontalInterval: 1,
+                                                      getDrawingHorizontalLine:
+                                                          (value) => FlLine(
+                                                            color:
+                                                                Colors.white12,
+                                                            strokeWidth: 1,
+                                                          ),
+                                                    ),
+                                                    borderData: FlBorderData(
+                                                      show: false,
+                                                    ),
+                                                    titlesData: FlTitlesData(
+                                                      bottomTitles: AxisTitles(
+                                                        sideTitles: SideTitles(
+                                                          showTitles: true,
+                                                          getTitlesWidget: (value, meta) {
+                                                            final idx = value
+                                                                .toInt();
+                                                            if (idx < 0 ||
+                                                                idx >=
+                                                                    todayLevels
+                                                                        .length) {
+                                                              return const SizedBox.shrink();
+                                                            }
+                                                            return Padding(
+                                                              padding:
+                                                                  const EdgeInsets.only(
+                                                                    top: 4,
+                                                                  ),
+                                                              child: Text(
+                                                                todayLevels[idx]
+                                                                    .period,
+                                                                style: const TextStyle(
+                                                                  fontSize: 11,
+                                                                  color: Colors
+                                                                      .white70,
+                                                                ),
+                                                              ),
+                                                            );
+                                                          },
+                                                        ),
+                                                      ),
+                                                      leftTitles: AxisTitles(
+                                                        sideTitles: SideTitles(
+                                                          showTitles: true,
+                                                          reservedSize: 30,
+                                                          getTitlesWidget: (value, meta) {
+                                                            return Text(
+                                                              value
+                                                                  .toStringAsFixed(
+                                                                    0,
+                                                                  ),
+                                                              style:
+                                                                  const TextStyle(
+                                                                    fontSize:
+                                                                        10,
+                                                                    color: Colors
+                                                                        .white60,
+                                                                  ),
+                                                            );
+                                                          },
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    barGroups: List.generate(
+                                                      todayLevels.length,
+                                                      (index) {
+                                                        final item =
+                                                            todayLevels[index];
+                                                        return BarChartGroupData(
+                                                          x: index,
+                                                          barRods: [
+                                                            BarChartRodData(
+                                                              toY: item.level,
+                                                              width: 18,
+                                                              borderRadius:
+                                                                  BorderRadius.circular(
+                                                                    4,
+                                                                  ),
+                                                            ),
+                                                          ],
+                                                        );
+                                                      },
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(height: 12),
+                                              Container(
+                                                width: double.infinity,
+                                                padding: const EdgeInsets.all(
+                                                  12,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(
+                                                    0xfffacc15,
+                                                  ).withOpacity(0.18),
+                                                  borderRadius:
+                                                      BorderRadius.circular(12),
+                                                ),
+                                                child: Row(
+                                                  children: [
+                                                    Icon(
+                                                      waterChange.trend ==
+                                                              Trend.up
+                                                          ? Icons.trending_up
+                                                          : waterChange.trend ==
+                                                                Trend.down
+                                                          ? Icons.trending_down
+                                                          : Icons
+                                                                .horizontal_rule,
+                                                      color:
+                                                          waterChange.trend ==
+                                                              Trend.up
+                                                          ? Colors.redAccent
+                                                          : waterChange.trend ==
+                                                                Trend.down
+                                                          ? Colors.greenAccent
+                                                          : Colors.white60,
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    Expanded(
+                                                      child: Text(
+                                                        _waterChangeText(
+                                                          waterChange,
+                                                        ),
+                                                        style: const TextStyle(
+                                                          fontSize: 13,
+                                                          color: Colors.white70,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                      if (isWide)
+                                        const SizedBox(width: 16)
+                                      else
+                                        const SizedBox(height: 16),
+                                      Flexible(
+                                        flex: 1,
+                                        child: _CardContainer(
+                                          title:
+                                              'Weekly Water Level Trend - ${_selectedSite == 'all' ? 'All Sites' : _selectedSite}',
+                                          child: Column(
+                                            children: [
+                                              SizedBox(
+                                                height: 240,
+                                                child: LineChart(
+                                                  LineChartData(
+                                                    gridData: FlGridData(
+                                                      show: true,
+                                                      drawVerticalLine: false,
+                                                      horizontalInterval: 1,
+                                                      getDrawingHorizontalLine:
+                                                          (value) => FlLine(
+                                                            color:
+                                                                Colors.white12,
+                                                            strokeWidth: 1,
+                                                          ),
+                                                    ),
+                                                    titlesData: FlTitlesData(
+                                                      bottomTitles: AxisTitles(
+                                                        sideTitles: SideTitles(
+                                                          showTitles: true,
+                                                          getTitlesWidget: (value, meta) {
+                                                            final idx = value
+                                                                .toInt();
+                                                            if (idx < 0 ||
+                                                                idx >=
+                                                                    weeklyTrend
+                                                                        .length) {
+                                                              return const SizedBox.shrink();
+                                                            }
+                                                            return Padding(
+                                                              padding:
+                                                                  const EdgeInsets.only(
+                                                                    top: 4,
+                                                                  ),
+                                                              child: Text(
+                                                                weeklyTrend[idx]
+                                                                    .day,
+                                                                style: const TextStyle(
+                                                                  fontSize: 11,
+                                                                  color: Colors
+                                                                      .white70,
+                                                                ),
+                                                              ),
+                                                            );
+                                                          },
+                                                        ),
+                                                      ),
+                                                      leftTitles: AxisTitles(
+                                                        sideTitles: SideTitles(
+                                                          showTitles: true,
+                                                          reservedSize: 30,
+                                                          getTitlesWidget: (value, meta) {
+                                                            return Text(
+                                                              value
+                                                                  .toStringAsFixed(
+                                                                    0,
+                                                                  ),
+                                                              style:
+                                                                  const TextStyle(
+                                                                    fontSize:
+                                                                        10,
+                                                                    color: Colors
+                                                                        .white60,
+                                                                  ),
+                                                            );
+                                                          },
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    borderData: FlBorderData(
+                                                      show: false,
+                                                    ),
+                                                    lineBarsData: [
+                                                      LineChartBarData(
+                                                        isCurved: true,
+                                                        dotData: FlDotData(
+                                                          show: true,
+                                                        ),
+                                                        barWidth: 3,
+                                                        spots: List.generate(
+                                                          weeklyTrend.length,
+                                                          (index) {
+                                                            final item =
+                                                                weeklyTrend[index];
+                                                            return FlSpot(
+                                                              index.toDouble(),
+                                                              item.level,
+                                                            );
+                                                          },
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(height: 12),
+                                              Container(
+                                                width: double.infinity,
+                                                padding: const EdgeInsets.all(
+                                                  12,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(
+                                                    0xffa855f7,
+                                                  ).withOpacity(0.2),
+                                                  borderRadius:
+                                                      BorderRadius.circular(12),
+                                                ),
+                                                child: Text(
+                                                  _weeklyTrendInsight(
+                                                    weeklyTrend,
+                                                  ),
+                                                  style: const TextStyle(
+                                                    fontSize: 13,
+                                                    color: Colors.white70,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                },
+                              ),
+
+                              const SizedBox(height: 16),
+
+                              // Row 3
+                              LayoutBuilder(
+                                builder: (context, constraints) {
+                                  final isWide = constraints.maxWidth > 800;
+                                  return Flex(
+                                    direction: isWide
+                                        ? Axis.horizontal
+                                        : Axis.vertical,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Flexible(
+                                        flex: 1,
+                                        child: _CardContainer(
+                                          title:
+                                              'Highest Water Levels This Week',
+                                          child: Column(
+                                            children: [
+                                              SizedBox(
+                                                height: 240,
+                                                child: BarChart(
+                                                  BarChartData(
+                                                    gridData: FlGridData(
+                                                      show: true,
+                                                      drawVerticalLine: false,
+                                                      horizontalInterval: 1,
+                                                      getDrawingHorizontalLine:
+                                                          (value) => FlLine(
+                                                            color:
+                                                                Colors.white12,
+                                                            strokeWidth: 1,
+                                                          ),
+                                                    ),
+                                                    borderData: FlBorderData(
+                                                      show: false,
+                                                    ),
+                                                    titlesData: FlTitlesData(
+                                                      bottomTitles: AxisTitles(
+                                                        sideTitles: SideTitles(
+                                                          showTitles: true,
+                                                          getTitlesWidget: (value, meta) {
+                                                            final idx = value
+                                                                .toInt();
+                                                            if (idx < 0 ||
+                                                                idx >=
+                                                                    highestSites
+                                                                        .length) {
+                                                              return const SizedBox.shrink();
+                                                            }
+                                                            return Padding(
+                                                              padding:
+                                                                  const EdgeInsets.only(
+                                                                    top: 4,
+                                                                  ),
+                                                              child: Text(
+                                                                highestSites[idx]
+                                                                    .site,
+                                                                style: const TextStyle(
+                                                                  fontSize: 11,
+                                                                  color: Colors
+                                                                      .white70,
+                                                                ),
+                                                              ),
+                                                            );
+                                                          },
+                                                        ),
+                                                      ),
+                                                      leftTitles: AxisTitles(
+                                                        sideTitles: SideTitles(
+                                                          showTitles: true,
+                                                          reservedSize: 30,
+                                                          getTitlesWidget: (value, meta) {
+                                                            return Text(
+                                                              value
+                                                                  .toStringAsFixed(
+                                                                    0,
+                                                                  ),
+                                                              style:
+                                                                  const TextStyle(
+                                                                    fontSize:
+                                                                        10,
+                                                                    color: Colors
+                                                                        .white60,
+                                                                  ),
+                                                            );
+                                                          },
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    barGroups: List.generate(
+                                                      highestSites.length,
+                                                      (index) {
+                                                        final item =
+                                                            highestSites[index];
+                                                        return BarChartGroupData(
+                                                          x: index,
+                                                          barRods: [
+                                                            BarChartRodData(
+                                                              toY:
+                                                                  item.avgLevel,
+                                                              width: 18,
+                                                              borderRadius:
+                                                                  BorderRadius.circular(
+                                                                    4,
+                                                                  ),
+                                                            ),
+                                                          ],
+                                                        );
+                                                      },
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(height: 12),
+                                              Container(
+                                                width: double.infinity,
+                                                padding: const EdgeInsets.all(
+                                                  12,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(
+                                                    0xffef4444,
+                                                  ).withOpacity(0.2),
+                                                  borderRadius:
+                                                      BorderRadius.circular(12),
+                                                ),
+                                                child: Text(
+                                                  _highestSiteInsight(
+                                                    highestSites,
+                                                  ),
+                                                  style: const TextStyle(
+                                                    fontSize: 13,
+                                                    color: Colors.white70,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                      if (isWide)
+                                        const SizedBox(width: 16)
+                                      else
+                                        const SizedBox(height: 16),
+                                      Flexible(
+                                        flex: 1,
+                                        child: _CardContainer(
+                                          title: 'Verification Status',
+                                          child: Column(
+                                            children: [
+                                              SizedBox(
+                                                height: 240,
+                                                child: PieChart(
+                                                  PieChartData(
+                                                    sectionsSpace: 4,
+                                                    centerSpaceRadius: 40,
+                                                    sections: verificationStats
+                                                        .map(
+                                                          (
+                                                            d,
+                                                          ) => PieChartSectionData(
+                                                            color: d.color,
+                                                            value: d.value
+                                                                .toDouble(),
+                                                            title:
+                                                                '${d.name}\n${d.value.toInt()}',
+                                                            radius: 70,
+                                                            titleStyle:
+                                                                const TextStyle(
+                                                                  fontSize: 12,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .bold,
+                                                                  color: Colors
+                                                                      .white,
+                                                                ),
+                                                          ),
+                                                        )
+                                                        .toList(),
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(height: 12),
+                                              Container(
+                                                width: double.infinity,
+                                                padding: const EdgeInsets.all(
+                                                  12,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(
+                                                    0xfff97316,
+                                                  ).withOpacity(0.18),
+                                                  borderRadius:
+                                                      BorderRadius.circular(12),
+                                                ),
+                                                child: Row(
+                                                  children: [
+                                                    Icon(
+                                                      verificationStats.length >
+                                                                  1 &&
+                                                              verificationStats[1]
+                                                                      .value >
+                                                                  0
+                                                          ? Icons.warning_amber
+                                                          : Icons.check_circle,
+                                                      color:
+                                                          verificationStats
+                                                                      .length >
+                                                                  1 &&
+                                                              verificationStats[1]
+                                                                      .value >
+                                                                  0
+                                                          ? Colors.orangeAccent
+                                                          : Colors.greenAccent,
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    Expanded(
+                                                      child: Text(
+                                                        _verificationInsight(
+                                                          verificationStats,
+                                                        ),
+                                                        style: const TextStyle(
+                                                          fontSize: 13,
+                                                          color: Colors.white70,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                },
+                              ),
+
+                              const SizedBox(height: 16),
+
+                              _CardContainer(
+                                title: 'Summary',
+                                child: Align(
+                                  alignment: Alignment.center,
+                                  child: Text(
+                                    'Last updated: ${DateFormat('dd MMM yyyy, hh:mm a').format(now)} | '
+                                    'Total Readings: ${readings.length}',
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.white70,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
                 },
               ),
-            ],
+            ),
           ),
+        ),
+      ),
+    );
+  }
+}
 
-          // --- Drawer ---
-          drawer: _buildDrawer(context),
+/// HEADER
 
-          body: _getBodyWidget(data),
+class _Header extends StatelessWidget {
+  final List<String> sites;
+  final String selectedSite;
+  final ValueChanged<String> onSiteChanged;
+
+  const _Header({
+    required this.sites,
+    required this.selectedSite,
+    required this.onSiteChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _CardContainer(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          const Icon(Icons.water_drop, color: Colors.lightBlueAccent, size: 40),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                Text(
+                  'Water Level Monitoring Dashboard',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'Real-time analytics and insights',
+                  style: TextStyle(fontSize: 13, color: Colors.white60),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 16),
+          DropdownButton<String>(
+            value: selectedSite,
+            dropdownColor: const Color(0xff020617),
+            borderRadius: BorderRadius.circular(12),
+            style: const TextStyle(color: Colors.white),
+            items: [
+              const DropdownMenuItem(value: 'all', child: Text('All Sites')),
+              ...sites.map((s) => DropdownMenuItem(value: s, child: Text(s))),
+            ],
+            onChanged: (v) {
+              if (v != null) onSiteChanged(v);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// CARD CONTAINER
+
+class _CardContainer extends StatelessWidget {
+  final String? title;
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+
+  const _CardContainer({
+    this.title,
+    required this.child,
+    this.padding = const EdgeInsets.all(16),
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cardColor = Theme.of(context).cardColor;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.35),
+            blurRadius: 14,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: padding,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (title != null) ...[
+              Text(
+                title!,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+            child,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// KEY METRICS
+
+class _KeyMetricsRow extends StatelessWidget {
+  final int lastHourCount;
+  final int last24Count;
+  final int lastWeekCount;
+  final int totalSites;
+
+  const _KeyMetricsRow({
+    required this.lastHourCount,
+    required this.last24Count,
+    required this.lastWeekCount,
+    required this.totalSites,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cards = [
+      _MetricCard(
+        label: 'Last Hour',
+        value: lastHourCount.toString(),
+        icon: Icons.schedule,
+        color: Colors.lightBlueAccent,
+      ),
+      _MetricCard(
+        label: 'Last 24 Hours',
+        value: last24Count.toString(),
+        icon: Icons.bolt,
+        color: Colors.greenAccent,
+      ),
+      _MetricCard(
+        label: 'Last Week',
+        value: lastWeekCount.toString(),
+        icon: Icons.map,
+        color: Colors.deepPurpleAccent,
+      ),
+      _MetricCard(
+        label: 'Total Sites',
+        value: totalSites.toString(),
+        icon: Icons.filter_alt,
+        color: Colors.orangeAccent,
+      ),
+    ];
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth > 800;
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: cards.length,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: isWide ? 4 : 2,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            mainAxisExtent: 100,
+          ),
+          itemBuilder: (context, index) => cards[index],
         );
       },
     );
   }
+}
 
-  // -------------------------------------------------------------------
-  // DRAWER IMPLEMENTATION
-  // -------------------------------------------------------------------
+class _MetricCard extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color color;
 
-  // ... (omitted _buildDrawer and _buildDrawerItem, assume definition is here)
-  Widget _buildDrawer(BuildContext context) {
-    return Drawer(
-      child: Container(
-        color: Theme.of(context).scaffoldBackgroundColor, // Dark background
-        child: Column(
-          children: <Widget>[
-            const DrawerHeader(
-              decoration: BoxDecoration(
-                color: Color(0xFF1E88E5), // Blue header color
-              ),
-              child: SizedBox(
-                width: double.infinity,
-                child: Text(
-                  'Analyst Menu',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
+  const _MetricCard({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _CardContainer(
+      padding: const EdgeInsets.all(14),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(12),
             ),
-
-            // Dashboard
-            _buildDrawerItem(
-              AnalystPage.dashboard,
-              Icons.dashboard,
-              'Dashboard',
-            ),
-
-            // Water Level Trends (NEW)
-            _buildDrawerItem(
-              AnalystPage.trends,
-              Icons.show_chart,
-              'Water Level Trends',
-            ),
-
-            // Profile (Moved from AppBar)
-            _buildDrawerItem(AnalystPage.profile, Icons.person, 'Profile'),
-
-            const Spacer(),
-            // Separator/Footer
-            const Padding(
-              padding: EdgeInsets.all(16.0),
-              child: Text(
-                "JALNETRA v1.0",
-                style: TextStyle(color: Colors.white54, fontSize: 12),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDrawerItem(AnalystPage page, IconData icon, String title) {
-    final isSelected = _currentPage == page;
-    return ListTile(
-      leading: Icon(
-        icon,
-        color: isSelected ? Theme.of(context).primaryColor : Colors.white70,
-      ),
-      title: Text(
-        title,
-        style: TextStyle(
-          color: isSelected ? Theme.of(context).primaryColor : Colors.white,
-          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-        ),
-      ),
-      selected: isSelected,
-      onTap: () {
-        // If profile is selected, push it (original behavior)
-        if (page == AnalystPage.profile) {
-          Navigator.pop(context); // Close the drawer first
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const ProfileScreen()),
-          );
-        } else {
-          // Change the current page state
-          setState(() {
-            _currentPage = page;
-          });
-          Navigator.pop(context); // Close the drawer
-        }
-      },
-    );
-  }
-
-  // --- STATS GRID ---
-  Widget _buildStatsGrid(BuildContext context, DashboardData data) {
-    // ... (omitted for brevity, assume definition is here)
-    return Column(
-      children: [
-        Row(
-          children: [
-            _buildStatCard(
-              context,
-              data,
-              "Data Received",
-              data.totalReceived,
-              Colors.green,
-              'dataReceived',
-            ),
-            const SizedBox(width: 12),
-            _buildStatCard(
-              context,
-              data,
-              "Safezone",
-              data.safeZone,
-              Colors.green,
-              'safeZone',
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            _buildStatCard(
-              context,
-              data,
-              "Danger Zones",
-              data.dangerZones,
-              Colors.red,
-              'dangerZones',
-            ),
-            const SizedBox(width: 12),
-            _buildStatCard(
-              context,
-              data,
-              "Warnings Today",
-              data.warningsToday,
-              Colors.yellow,
-              'warningsToday',
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStatCard(
-    BuildContext context,
-    DashboardData data,
-    String title,
-    int count,
-    Color color,
-    String viewKey,
-  ) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: () {
-          _navigateToDetail(context, data, viewKey, title, color);
-        },
-        child: Card(
-          color: Theme.of(context).cardColor,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8.0),
+            child: Icon(icon, color: color, size: 26),
           ),
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
+          const SizedBox(width: 10),
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: TextStyle(color: color, fontSize: 16)),
-                const SizedBox(height: 8),
                 Text(
-                  count.toString().padLeft(2, '0'),
+                  label,
+                  style: const TextStyle(fontSize: 12, color: Colors.white60),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  value,
                   style: TextStyle(
-                    fontSize: 36,
+                    fontSize: 20,
                     fontWeight: FontWeight.bold,
                     color: color,
                   ),
@@ -529,225 +1158,323 @@ class _AnalystDashboardScreenState extends State<AnalystDashboardScreen> {
               ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-
-  // --- QUICK INSIGHTS (RADIAL BAR CHART) ---
-  Widget _buildQuickInsights(BuildContext context, DashboardData data) {
-    // ... (omitted for brevity, assume definition is here)
-    final total = data.totalReceived.toDouble();
-
-    final dangerPercent = total > 0 ? (data.dangerZones / total) * 100 : 0.0;
-    final warningPercent = total > 0 ? (data.warningsToday / total) * 100 : 0.0;
-    final safePercent = total > 0 ? (data.safeZone / total) * 100 : 0.0;
-
-    List<PieChartSectionData> sections = [
-      // 1. DANGER (Red) - Reduced Radius and Opacity
-      PieChartSectionData(
-        value: dangerPercent,
-        color: Colors.red.withOpacity(0.5), // Reduced opacity
-        title: '',
-        radius: 60, // Reduced radius (width)
-        showTitle: false,
-      ),
-      // 2. WARNING (Yellow) - Medium Radius
-      PieChartSectionData(
-        value: warningPercent,
-        color: Colors.yellow.shade700,
-        title: '',
-        radius: 65,
-        showTitle: false,
-      ),
-      // 3. SAFE (Green) - Smallest Radius (Innermost)
-      PieChartSectionData(
-        value: safePercent,
-        color: Colors.green,
-        title: '',
-        radius: 50,
-        showTitle: false,
-      ),
-    ];
-
-    return Card(
-      color: Theme.of(context).cardColor,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              "Quick Insights",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 10),
-
-            SizedBox(
-              height: 200,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  PieChart(
-                    PieChartData(
-                      sectionsSpace: 4,
-                      centerSpaceRadius: 30,
-                      startDegreeOffset: 270,
-                      sections: sections,
-                    ),
-                  ),
-                  Text(
-                    '${data.totalReceived}\nTOTAL',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).textTheme.bodyLarge?.color,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 10),
-
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildLegendItem(
-                  Colors.red.withOpacity(0.5),
-                  "Danger (${data.dangerZones})",
-                ),
-                _buildLegendItem(
-                  Colors.yellow.shade700,
-                  "Warnings (${data.warningsToday})",
-                ),
-                _buildLegendItem(Colors.green, "Safe Zone (${data.safeZone})"),
-                const SizedBox(height: 10),
-                Text(
-                  "Total Readings: ${data.totalReceived}",
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLegendItem(Color color, String label) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
-      child: Row(
-        children: [
-          Icon(Icons.circle, size: 12, color: color),
-          const SizedBox(width: 8),
-          Text(label, style: const TextStyle(fontSize: 14)),
         ],
       ),
     );
   }
+}
 
-  // --- MOCKED DATA LIST ---
-  Widget _buildDataReceivedList(BuildContext context, DashboardData data) {
-    // ... (omitted for brevity, assume definition is here)
-    // This mocks the dam-specific structure in the image provided
-    List<Map<String, dynamic>> mockDamData = [
-      {'name': 'Mettur Dam', 'tmc_filled': 72.0, 'tmc_total': 93.0},
-      {'name': 'Vaigai Dam', 'tmc_filled': 54.0, 'tmc_total': 71.0},
-      {'name': 'Bhavani Dam', 'tmc_filled': 30.0, 'tmc_total': 32.0},
-    ];
+//
+// ---------- DATA MODEL & ANALYTICS (same as before) ----------
+//
 
-    return Card(
-      color: Theme.of(context).cardColor,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: Text(
-              "Status Summary (TMC)",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-          ),
+class Reading {
+  final String id;
+  final String siteId;
+  final double waterLevel;
+  final bool isManual;
+  final bool isVerified;
+  final DateTime timestamp;
+  final String officerId;
 
-          const Divider(height: 1),
+  Reading({
+    required this.id,
+    required this.siteId,
+    required this.waterLevel,
+    required this.isManual,
+    required this.isVerified,
+    required this.timestamp,
+    required this.officerId,
+  });
 
-          // Header Row
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-            child: Row(
-              children: [
-                Expanded(
-                  flex: 3,
-                  child: Text(
-                    "Name",
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-                Expanded(
-                  flex: 2,
-                  child: Text(
-                    "TMC",
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-                Expanded(
-                  flex: 1,
-                  child: Text(
-                    "Status",
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Divider(height: 1),
+  factory Reading.fromDoc(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>? ?? {};
+    final ts = data['timestamp'];
+    DateTime dateTime;
 
-          // Data Rows
-          ...mockDamData.map((dam) {
-            double percent = dam['tmc_filled'] / dam['tmc_total'];
-            Color statusColor;
-            if (percent > 0.95) {
-              statusColor = Colors.red; // Near capacity
-            } else if (percent > 0.75) {
-              statusColor = Colors.yellow; // High warning
-            } else {
-              statusColor = Colors.green; // Normal
-            }
+    if (ts is Timestamp) {
+      dateTime = ts.toDate();
+    } else if (ts is DateTime) {
+      dateTime = ts;
+    } else if (ts is String) {
+      dateTime = DateTime.tryParse(ts) ?? DateTime.now();
+    } else {
+      dateTime = DateTime.now();
+    }
 
-            return Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16.0,
-                vertical: 8.0,
-              ),
-              child: Row(
-                children: [
-                  Expanded(flex: 3, child: Text(dam['name'])),
-                  Expanded(
-                    flex: 2,
-                    child: Text(
-                      "${dam['tmc_filled'].toStringAsFixed(1)} / ${dam['tmc_total'].toStringAsFixed(0)}",
-                    ),
-                  ),
-                  Expanded(
-                    flex: 1,
-                    child: Icon(Icons.circle, size: 10, color: statusColor),
-                  ),
-                ],
-              ),
-            );
-          }).toList(),
-
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Text(
-              "Total verified river readings used for stats: ${data.readings.length}.",
-              style: const TextStyle(color: Colors.grey),
-            ),
-          ),
-        ],
-      ),
+    return Reading(
+      id: doc.id,
+      siteId: (data['siteId'] ?? '') as String,
+      waterLevel: (data['waterLevel'] as num?)?.toDouble() ?? 0.0,
+      isManual: (data['isManual'] as bool?) ?? false,
+      isVerified: (data['isVerified'] as bool?) ?? false,
+      timestamp: dateTime,
+      officerId: (data['officerId'] ?? '') as String,
     );
   }
+}
+
+class PieStat {
+  final String name;
+  final double value;
+  final Color color;
+
+  PieStat(this.name, this.value, this.color);
+}
+
+class SiteCount {
+  final String site;
+  final int count;
+
+  SiteCount(this.site, this.count);
+}
+
+class DayTrend {
+  final String day;
+  final double level;
+  final int count;
+
+  DayTrend(this.day, this.level, this.count);
+}
+
+class SiteAvgLevel {
+  final String site;
+  final double avgLevel;
+
+  SiteAvgLevel(this.site, this.avgLevel);
+}
+
+class TimePeriodLevel {
+  final String period;
+  final double level;
+
+  TimePeriodLevel(this.period, this.level);
+}
+
+enum Trend { up, down, stable }
+
+class WaterChange {
+  final double change;
+  final Trend trend;
+  final double percentage;
+
+  const WaterChange({
+    required this.change,
+    required this.trend,
+    required this.percentage,
+  });
+
+  const WaterChange.zero() : change = 0, trend = Trend.stable, percentage = 0;
+}
+
+int getReadingsByTimeRange(List<Reading> readings, String site, int hours) {
+  final cutoff = DateTime.now().subtract(Duration(hours: hours));
+  return readings.where((r) {
+    final siteOk = site == 'all' || r.siteId == site;
+    return siteOk && r.timestamp.isAfter(cutoff);
+  }).length;
+}
+
+List<PieStat> getManualVsAutomated(List<Reading> readings) {
+  final manual = readings.where((r) => r.isManual).length;
+  final automated = readings.length - manual;
+  return [
+    PieStat('Manual', manual.toDouble(), const Color(0xff3b82f6)),
+    PieStat('Automated', automated.toDouble(), const Color(0xff10b981)),
+  ];
+}
+
+List<SiteCount> getSiteReadingsCount(List<Reading> readings) {
+  final Map<String, int> counts = {};
+  for (final r in readings) {
+    counts[r.siteId] = (counts[r.siteId] ?? 0) + 1;
+  }
+  return counts.entries.map((e) => SiteCount(e.key, e.value)).toList()
+    ..sort((a, b) => b.count.compareTo(a.count));
+}
+
+List<TimePeriodLevel> getTodayWaterLevels(List<Reading> readings, String site) {
+  final now = DateTime.now();
+  final todayStart = DateTime(now.year, now.month, now.day);
+
+  final todayReadings = readings.where((r) {
+    if (r.siteId != site) return false;
+    return r.timestamp.isAfter(todayStart);
+  }).toList();
+
+  List<Reading> filterBy(
+    int startHour,
+    int endHour, {
+    bool wrapsMidnight = false,
+  }) {
+    return todayReadings.where((r) {
+      final hour = r.timestamp.hour;
+      if (wrapsMidnight) {
+        return hour >= startHour || hour < endHour;
+      } else {
+        return hour >= startHour && hour < endHour;
+      }
+    }).toList();
+  }
+
+  double avg(List<Reading> list) {
+    if (list.isEmpty) return 0;
+    return list.map((e) => e.waterLevel).reduce((a, b) => a + b) / list.length;
+  }
+
+  final morning = filterBy(6, 12);
+  final afternoon = filterBy(12, 18);
+  final night = filterBy(18, 6, wrapsMidnight: true);
+
+  return [
+    TimePeriodLevel('Morning', avg(morning)),
+    TimePeriodLevel('Afternoon', avg(afternoon)),
+    TimePeriodLevel('Night', avg(night)),
+  ];
+}
+
+List<DayTrend> getWeeklyTrend(List<Reading> readings, String site) {
+  final List<DayTrend> list = [];
+  final now = DateTime.now();
+
+  for (int i = 6; i >= 0; i--) {
+    final day = now.subtract(Duration(days: i));
+    final start = DateTime(day.year, day.month, day.day);
+    final end = start.add(const Duration(days: 1));
+
+    final dayReadings = readings.where((r) {
+      if (site != 'all' && r.siteId != site) return false;
+      return r.timestamp.isAfter(start) && r.timestamp.isBefore(end);
+    }).toList();
+
+    double avg = 0;
+    if (dayReadings.isNotEmpty) {
+      avg =
+          dayReadings.map((e) => e.waterLevel).reduce((a, b) => a + b) /
+          dayReadings.length;
+    }
+
+    list.add(DayTrend(DateFormat.E().format(day), avg, dayReadings.length));
+  }
+
+  return list;
+}
+
+List<SiteAvgLevel> getHighestWaterLevelSite(List<Reading> readings) {
+  final weekAgo = DateTime.now().subtract(const Duration(days: 7));
+  final weekReadings = readings
+      .where((r) => r.timestamp.isAfter(weekAgo))
+      .toList();
+
+  final Map<String, List<double>> siteValues = {};
+  for (final r in weekReadings) {
+    siteValues.putIfAbsent(r.siteId, () => []).add(r.waterLevel);
+  }
+
+  final list = siteValues.entries.map((e) {
+    final avg = e.value.reduce((a, b) => a + b) / e.value.length;
+    return SiteAvgLevel(e.key, avg);
+  }).toList();
+
+  list.sort((a, b) => b.avgLevel.compareTo(a.avgLevel));
+  return list;
+}
+
+List<PieStat> getVerificationStats(List<Reading> readings) {
+  final verified = readings.where((r) => r.isVerified).length;
+  final unverified = readings.length - verified;
+  return [
+    PieStat('Verified', verified.toDouble(), const Color(0xff10b981)),
+    PieStat('Pending', unverified.toDouble(), const Color(0xfff59e0b)),
+  ];
+}
+
+WaterChange getWaterLevelChange(List<Reading> readings, String site) {
+  final siteReadings = readings.where((r) => r.siteId == site).toList()
+    ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+
+  if (siteReadings.length < 2) {
+    return const WaterChange.zero();
+  }
+
+  final latest = siteReadings[0].waterLevel;
+  final previous = siteReadings[1].waterLevel;
+  final change = latest - previous;
+
+  Trend trend;
+  if (change > 0.1) {
+    trend = Trend.up;
+  } else if (change < -0.1) {
+    trend = Trend.down;
+  } else {
+    trend = Trend.stable;
+  }
+
+  final percentage = previous == 0 ? 0 : (change / previous) * 100;
+
+  return WaterChange(
+    change: double.parse(change.toStringAsFixed(2)),
+    trend: trend,
+    percentage: double.parse(percentage.toStringAsFixed(1)),
+  );
+}
+
+String _manualAutoInsight(List<PieStat> stats) {
+  if (stats.length < 2) return 'No data available.';
+  final manual = stats[0].value;
+  final auto = stats[1].value;
+  if (manual > auto) {
+    return 'Insight: Manual readings dominate. Consider increasing automation for efficiency.';
+  } else {
+    return 'Insight: Automated readings are predominant. System is running efficiently.';
+  }
+}
+
+String _siteReadingsInsight(List<SiteCount> list) {
+  if (list.isEmpty) return 'No site data available.';
+  final top = list.first;
+  return 'Insight: Site ${top.site} has the most readings (${top.count}). Monitor less active sites to ensure coverage.';
+}
+
+String _weeklyTrendInsight(List<DayTrend> list) {
+  if (list.length < 2) {
+    return 'Not enough data to determine weekly trend.';
+  }
+  final first = list.first;
+  final last = list.last;
+  if (last.level > first.level) {
+    return 'Insight: Weekly average shows an increasing trend. Monitor for possible flooding risks.';
+  } else if (last.level < first.level) {
+    return 'Insight: Weekly average shows a decreasing trend. Watch for potential drought conditions.';
+  } else {
+    return 'Insight: Weekly average appears stable.';
+  }
+}
+
+String _highestSiteInsight(List<SiteAvgLevel> list) {
+  if (list.isEmpty) {
+    return 'No readings available for the last week.';
+  }
+  final top = list.first;
+  return 'Alert: Site ${top.site} has the highest average water level (${top.avgLevel.toStringAsFixed(2)} m). Priority monitoring required.';
+}
+
+String _verificationInsight(List<PieStat> list) {
+  if (list.length < 2) return 'No verification data.';
+  final pending = list[1].value;
+  if (pending > 10) {
+    return 'Status: ${pending.toInt()} readings pending verification. Supervisor action needed.';
+  } else if (pending > 0) {
+    return 'Status: ${pending.toInt()} readings pending. System is mostly up to date.';
+  } else {
+    return 'Status: All readings verified. System up to date.';
+  }
+}
+
+String _waterChangeText(WaterChange c) {
+  if (c.trend == Trend.stable) {
+    return 'Change: 0m (0%) - Water level is stable compared to the previous reading.';
+  }
+  final dir = c.trend == Trend.up ? 'rising' : 'falling';
+  return 'Change: ${c.change}m (${c.percentage}%) - Water level is $dir compared to the previous reading.';
 }

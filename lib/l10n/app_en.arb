@@ -134,7 +134,27 @@
   "autoWaterLevel": "Automatic Water Level (DL Model)",
   "manualWaterLevel": "Manual Water Level Entry",
   "processingImage": "Processing image...",
-  "awaitingDl": "Awaiting DL Model result..."
+  "awaitingDl": "Awaiting DL Model result...",
+
+  "liveTitle": "Live Validation",
+  "liveInitMessage": "Initializing camera...",
+  "liveInitVoice": "Initializing camera. Please wait.",
+  "liveNoCamera": "No camera found on this device.",
+  "liveCameraError": "Error initializing camera. Please go back and try again.",
+  "liveChecking": "Checking...",
+  "liveAimAtGauge": "Aim at the gauge...",
+  "liveCameraReadyVoice": "Camera ready. Please aim at the water level gauge and hold your phone steady.",
+  "liveGaugeNotFound": "Gauge Not Found",
+  "liveFrameError": "Unable to validate frame. Please try again.",
+  "liveGaugeNotDetectedAim": "Gauge not detected. Aim at the gauge and hold steady.",
+  "liveTooFarOverlay": "Move Closer",
+  "liveTooFarBottom": "Gauge detected, but you are too far. Please move closer.",
+  "liveReadyOverlay": "Gauge Found - Capture Enabled",
+  "liveReadyBottom": "Gauge detected. Hold steady and press the capture button.",
+  "liveNetworkError": "Network error during validation.",
+  "liveCaptureSuccess": "Image captured successfully.",
+  "liveCaptureError": "There was an error capturing the image. Please try again."
+
 
 
 }

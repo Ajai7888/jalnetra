@@ -64,11 +64,6 @@ class SupervisorAlertsView extends StatelessWidget {
     );
   }
 
-  // --- Widget Builders for Visual Styling ---
-  // ... (rest of the code remains the same)
-  // ... (rest of the code remains the same)
-  // ... (rest of the code remains the same)
-
   Widget _buildCriticalAlertCard(BuildContext context) {
     // Red background at 40% opacity, Yellow button at 75% opacity
     return Container(

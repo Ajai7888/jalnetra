@@ -2,12 +2,11 @@
 
 import 'dart:io';
 import 'dart:convert';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:image_picker/image_picker.dart'; // Still needed for XFile type
+import 'package:image_picker/image_picker.dart';
 import 'package:steganograph/steganograph.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:speech_to_text/speech_recognition_result.dart';
@@ -74,7 +73,6 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
   double _distanceFromSite = 0.0;
   Position? _currentPosition;
   bool _isSubmitting = false;
-
   bool _isDLProcessing = false;
 
   /// NEW: DL result status (for “not gauge” message)
@@ -494,19 +492,21 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
     }
   }
 
-  Future<File> _encodeReadingData(File originalImage, double waterLevel) async {
+  Future<File> _encodeReadingData(
+    File originalImage,
+    double autoLevel, {
+    double? manualLevel,
+  }) async {
     final user = FirebaseAuth.instance.currentUser!;
     final officerEmail = user.email ?? 'N/A';
-
-    final autoLevel = _autoLevelController.text;
 
     final metadata =
         'SiteID:${_scannedQRData!.siteId}|'
         'SiteName:${_siteMetrics?.name ?? 'N/A'}|'
         'OfficerID:${user.uid}|'
         'OfficerEmail:$officerEmail|'
-        'LevelManual:${waterLevel.toStringAsFixed(2)}m|'
-        'LevelAuto:$autoLevel m|'
+        'LevelManual:${manualLevel != null ? manualLevel.toStringAsFixed(2) : 'N/A'}m|'
+        'LevelAuto:${autoLevel.toStringAsFixed(2)}m|'
         'TankLevelMax:${_siteMetrics?.fullTankLevelMeters.toStringAsFixed(2) ?? 'N/A'}m|'
         'CapacityMax:${_siteMetrics?.fullCapacityTMC.toStringAsFixed(2) ?? 'N/A'}TMC|'
         'GeoLiveLat:${_currentPosition!.latitude.toStringAsFixed(5)}|'
@@ -533,18 +533,39 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
   Future<void> _submitReading(bool isManual) async {
     final t = AppLocalizations.of(context)!;
 
-    if (!_formKey.currentState!.validate() || _capturedImage == null) {
+    // Image required
+    if (_capturedImage == null) {
       _showSnackBar(t.missingData, Colors.red);
+      return;
+    }
+
+    // ✅ Automatic level is MANDATORY
+    final autoText = _autoLevelController.text.trim();
+    if (autoText.isEmpty) {
+      _showSnackBar(
+        '${t.missingData}: automatic water level is required.',
+        Colors.red,
+      );
       return;
     }
 
     setState(() => _isSubmitting = true);
 
     try {
-      final waterLevel = double.parse(_levelController.text);
+      // Parse AUTO level (main value)
+      final autoLevel = double.parse(autoText);
+
+      // Manual is OPTIONAL – only parse if not empty
+      final manualText = _levelController.text.trim();
+      final double? manualLevel = manualText.isEmpty
+          ? null
+          : double.tryParse(manualText);
+
+      // Steganography: pass both values
       final encodedImageFile = await _encodeReadingData(
         _capturedImage!,
-        waterLevel,
+        autoLevel,
+        manualLevel: manualLevel,
       );
 
       final user = FirebaseAuth.instance.currentUser!;
@@ -552,7 +573,7 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
         id: '',
         siteId: _scannedQRData!.siteId,
         officerId: user.uid,
-        waterLevel: waterLevel,
+        waterLevel: autoLevel, // ✅ store AUTO as main value
         imageUrl: '',
         location: GeoPoint(
           _currentPosition!.latitude,
@@ -1024,7 +1045,6 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
             ),
             const SizedBox(height: 20),
 
-            // Manual entry
             TextFormField(
               controller: _levelController,
               decoration: InputDecoration(
@@ -1043,8 +1063,7 @@ class _CaptureFlowScreenState extends State<CaptureFlowScreen> {
               keyboardType: const TextInputType.numberWithOptions(
                 decimal: true,
               ),
-              validator: (value) =>
-                  (value == null || value.isEmpty) ? t.levelRequired : null,
+              // ❌ no validator here
             ),
 
             if (_isListening)

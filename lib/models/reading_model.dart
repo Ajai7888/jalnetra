@@ -25,14 +25,15 @@ class WaterReading {
   });
 
   factory WaterReading.fromFirestore(DocumentSnapshot doc) {
-    Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+    final data = doc.data() as Map<String, dynamic>;
+
     return WaterReading(
       id: doc.id,
       siteId: data['siteId'] ?? '',
       officerId: data['officerId'] ?? '',
       waterLevel: (data['waterLevel'] as num?)?.toDouble() ?? 0.0,
       imageUrl: data['imageUrl'] ?? '',
-      location: data['location'] ?? const GeoPoint(0, 0),
+      location: data['location'] as GeoPoint? ?? const GeoPoint(0, 0),
       timestamp: (data['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now(),
       isVerified: data['isVerified'] ?? false,
       isManual: data['isManual'] ?? false,
@@ -46,7 +47,7 @@ class WaterReading {
       'waterLevel': waterLevel,
       'imageUrl': imageUrl,
       'location': location,
-      'timestamp': timestamp,
+      'timestamp': Timestamp.fromDate(timestamp),
       'isVerified': isVerified,
       'isManual': isManual,
     };

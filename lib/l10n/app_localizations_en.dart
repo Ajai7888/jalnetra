@@ -380,4 +380,58 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get awaitingDl => 'Awaiting DL Model result...';
+
+  @override
+  String get liveTitle => 'Live Validation';
+
+  @override
+  String get liveInitMessage => 'Initializing camera...';
+
+  @override
+  String get liveInitVoice => 'Initializing camera. Please wait.';
+
+  @override
+  String get liveNoCamera => 'No camera found on this device.';
+
+  @override
+  String get liveCameraError => 'Error initializing camera. Please go back and try again.';
+
+  @override
+  String get liveChecking => 'Checking...';
+
+  @override
+  String get liveAimAtGauge => 'Aim at the gauge...';
+
+  @override
+  String get liveCameraReadyVoice => 'Camera ready. Please aim at the water level gauge and hold your phone steady.';
+
+  @override
+  String get liveGaugeNotFound => 'Gauge Not Found';
+
+  @override
+  String get liveFrameError => 'Unable to validate frame. Please try again.';
+
+  @override
+  String get liveGaugeNotDetectedAim => 'Gauge not detected. Aim at the gauge and hold steady.';
+
+  @override
+  String get liveTooFarOverlay => 'Move Closer';
+
+  @override
+  String get liveTooFarBottom => 'Gauge detected, but you are too far. Please move closer.';
+
+  @override
+  String get liveReadyOverlay => 'Gauge Found - Capture Enabled';
+
+  @override
+  String get liveReadyBottom => 'Gauge detected. Hold steady and press the capture button.';
+
+  @override
+  String get liveNetworkError => 'Network error during validation.';
+
+  @override
+  String get liveCaptureSuccess => 'Image captured successfully.';
+
+  @override
+  String get liveCaptureError => 'There was an error capturing the image. Please try again.';
 }

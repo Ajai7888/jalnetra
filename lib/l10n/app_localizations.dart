@@ -834,6 +834,114 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Awaiting DL Model result...'**
   String get awaitingDl;
+
+  /// No description provided for @liveTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Live Validation'**
+  String get liveTitle;
+
+  /// No description provided for @liveInitMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Initializing camera...'**
+  String get liveInitMessage;
+
+  /// No description provided for @liveInitVoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Initializing camera. Please wait.'**
+  String get liveInitVoice;
+
+  /// No description provided for @liveNoCamera.
+  ///
+  /// In en, this message translates to:
+  /// **'No camera found on this device.'**
+  String get liveNoCamera;
+
+  /// No description provided for @liveCameraError.
+  ///
+  /// In en, this message translates to:
+  /// **'Error initializing camera. Please go back and try again.'**
+  String get liveCameraError;
+
+  /// No description provided for @liveChecking.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking...'**
+  String get liveChecking;
+
+  /// No description provided for @liveAimAtGauge.
+  ///
+  /// In en, this message translates to:
+  /// **'Aim at the gauge...'**
+  String get liveAimAtGauge;
+
+  /// No description provided for @liveCameraReadyVoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Camera ready. Please aim at the water level gauge and hold your phone steady.'**
+  String get liveCameraReadyVoice;
+
+  /// No description provided for @liveGaugeNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Gauge Not Found'**
+  String get liveGaugeNotFound;
+
+  /// No description provided for @liveFrameError.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to validate frame. Please try again.'**
+  String get liveFrameError;
+
+  /// No description provided for @liveGaugeNotDetectedAim.
+  ///
+  /// In en, this message translates to:
+  /// **'Gauge not detected. Aim at the gauge and hold steady.'**
+  String get liveGaugeNotDetectedAim;
+
+  /// No description provided for @liveTooFarOverlay.
+  ///
+  /// In en, this message translates to:
+  /// **'Move Closer'**
+  String get liveTooFarOverlay;
+
+  /// No description provided for @liveTooFarBottom.
+  ///
+  /// In en, this message translates to:
+  /// **'Gauge detected, but you are too far. Please move closer.'**
+  String get liveTooFarBottom;
+
+  /// No description provided for @liveReadyOverlay.
+  ///
+  /// In en, this message translates to:
+  /// **'Gauge Found - Capture Enabled'**
+  String get liveReadyOverlay;
+
+  /// No description provided for @liveReadyBottom.
+  ///
+  /// In en, this message translates to:
+  /// **'Gauge detected. Hold steady and press the capture button.'**
+  String get liveReadyBottom;
+
+  /// No description provided for @liveNetworkError.
+  ///
+  /// In en, this message translates to:
+  /// **'Network error during validation.'**
+  String get liveNetworkError;
+
+  /// No description provided for @liveCaptureSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Image captured successfully.'**
+  String get liveCaptureSuccess;
+
+  /// No description provided for @liveCaptureError.
+  ///
+  /// In en, this message translates to:
+  /// **'There was an error capturing the image. Please try again.'**
+  String get liveCaptureError;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

@@ -15,6 +15,7 @@ import 'package:jalnetra01/screens/public_user/public_dashboard_screen.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../../main.dart';
+import '../field_officer/field_officer_home_screen.dart';
 
 class RoleSelectionScreen extends StatefulWidget {
   const RoleSelectionScreen({super.key});
@@ -54,7 +55,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
   Widget _getDashboard(AppUser user) {
     switch (user.role) {
       case UserRole.fieldOfficer:
-        return const OfficerDashboardScreen();
+        return const FieldOfficerHomeScreen();
       case UserRole.supervisor:
         return const SupervisorDashboardScreen();
       case UserRole.analyst:
