@@ -1,16 +1,34 @@
-# jalnetra01
+# JalNetra – Smart Water Monitoring System
 
-A new Flutter project.
+JalNetra is a Flutter-based mobile application designed for smart water level monitoring and field data collection. The app enables secure, location-verified water readings with image capture and real-time synchronization using Firebase.
 
-## Getting Started
+## 🚀 Features
+- Flutter-based cross-platform mobile application
+- Secure user authentication (role-based access)
+- Water level data capture with image proof
+- Location validation and anti-spoofing checks
+- Real-time data storage using Firebase Firestore
+- Cloud Storage integration for image uploads
+- Dashboard views for analysis and monitoring
 
-This project is a starting point for a Flutter application.
+## 🛠 Tech Stack
+- Flutter & Dart
+- Firebase Authentication
+- Cloud Firestore
+- Firebase Storage
+- REST API integration
 
-A few resources to get you started if this is your first Flutter project:
+## 📱 Use Case
+JalNetra is designed for field officers and analysts to collect reliable water-level data for monitoring reservoirs, canals, and water bodies in a tamper-resistant and scalable manner.
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+## ▶️ Getting Started
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+### Prerequisites
+- Flutter SDK
+- Android Studio / VS Code
+- Firebase project setup
+
+### Run Locally
+```bash
+flutter pub get
+flutter run
